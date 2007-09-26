@@ -26,9 +26,9 @@ Author URI: http://digitalhymn.com/
  *  wpp_get_posts($filter, $limit): gets all the posts matching a filter
  *  wpp_uri_category($field, $default): gets the category of the loaded page
  *  wpp_in_category($nicename): [TheLoop] checks if the posts belongs to that category
- *  wpp_is_parent_category($parent, $child): checks if the category is parent of another (nicename)
+ *  wpp_is_term_child_of($child, $parent): checks if the category is child of another (nicename)
  *  wpp_get_post_custom($custom, $before, $after, $optid): [TheLoop] gets the specified custom
- *  wpp_get_page_content($nicename): gets the specified page content
+ *  wpp_get_page_content($nicename, $on_empty): gets the specified page content
  *  wpp_is_admin($userid): check if the current logged user is an "administrator"
  *  wpp_get_last_comments($size): gets all the last comments
  *  wpp_get_last_comments_grouped($size): gets the last comments, one comment per post
@@ -162,7 +162,7 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	}
 
 	/****************************************************************************************************
-	 * Gets all the posts into an array. Wraps k_foreach_post().
+	 * Gets all the posts into an array. Wraps wpp_foreach_post().
 	 *
 	 * @param			filter string (SQL WHERE) or array (converted to SQL WHERE, AND of equals (==))
 	 * @param			limit string (i.e. 1 or 1,10)
@@ -183,7 +183,7 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	 *
 	 * @param			term nicename (slug)
 	 * @param			(optional) depth of recursion (defult: -1, ALL)
-	 * @param			(optional) taxonomy
+	 * @param			(optional) taxonomy, defaults to 'category'
 	 * @return		array of raw term rows
 	 */
 	function wpp_get_terms_recursive($ref, $levels = -1, $taxonomy = 'category') {
@@ -194,9 +194,9 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 		if ($ref !== '') {
 			// ****** Where
 			if (strval($ref) === strval(intval($ref))) {
-				$where = "AND tt.parent = '" . $ref . "'"; // *** INT, use id
+				$where = "AND tt.parent = '" . $ref . "'"; // *** INT, use id for PARENT
 			} else {
-				$where = "AND t.slug = '" . $ref . "'"; // *** STRING, use slug
+				$where = "AND t.slug = '" . $ref . "'"; // *** STRING, use slug for TERM
 			}
 			
 			// ****** Query
@@ -222,53 +222,6 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 			}
 		}
 		
-		return $out;
-	}
-	
-	/****************************************************************************************************
-	 * Get the category matching the nicename and all its children in a flat array.
-	 *
-	 * @param			category nicename
-	 * @param			(optional) depth of recursion (defult: -1, ALL)
-	 * @return		single post array
-	 */
-	function wpp_get_categories_children_flat_array($category_ref, $levels = -1) {
-		global $wpdb;
-
-		$out = array();
-
-		if ($category_ref !== '') {
-			// ****** Conditional WHERE
-			if (strval($category_ref) === strval(intval($category_ref))) {
-				$where = "WHERE c.category_parent = '" . $category_ref . "'";	
-			
-				if ($levels != -1) {
-					if ($levels > 0) $levels--;
-				}
-			} else {
-				$where = "WHERE c.category_nicename = '" . $category_ref . "'";
-			}
-		
-			// ****** Querying
-			$query = "
-				SELECT *
-				FROM " . $wpdb->categories . " As c
-				" . $where . "
-				";
-		
-			if ($categories = $wpdb->get_results($query))
-			{
-				// ***Loop
-				foreach ($categories as $category) {
-					$out[] = $category;
-				
-					if ($levels == -1 || $levels > 0) {
-						$out = array_merge($out, wpp_get_categories_children_flat_array($category->cat_ID, $levels));
-					}
-				}
-			}
-		}
-	
 		return $out;
 	}
 
@@ -351,34 +304,32 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	 * Checks if the post in the_loop belongs to the specified category nicename.
 	 * Different from in_category(), that checks for the id, not for the nicename.
 	 *
-	 * @param		nicename string
+	 * @param		container category nicename (slug)
+	 * @param		(optional) optional parent nicename
 	 * @return	boolean
 	 */
 	function wpp_in_category($nicename) {
-		$out = false;
-		$category = get_the_category();
-
-		foreach ($category as $cat) {
-			if ($nicename == $cat->category_nicename)
-				$out = true;
-		}
-
-		return $out;
+		return wpp_is_term_child_of($nicename, get_the_category());
 	}
 
 	/****************************************************************************************************
-	 * Checks if a category is parent (or the same) of another.
+	 * Checks if a category is child of another. Counts also self as true.
 	 *
-	 * @param		parent category
 	 * @param		child category
+	 * @param		parent category (or array)
 	 * @return	boolean true
 	 */
-	function wpp_is_parent_category($parent_nicename, $child_nicename) {
-		$categories = wpp_get_categories_children_flat_array($parent_nicename);
+	function wpp_is_term_child_of($child_term, $parent_term) {
+		if (is_array($parent_term)) {
+			$terms = $parent_term;
+		} else {
+			$terms = wpp_get_terms_recursive(strval($parent_term));
+		}
 
-		foreach ($categories as $category) {
-			if ($category->category_nicename == $child_nicename)
+		foreach ($terms as $term) {
+			if ($child_term == $term->slug) {
 				return true;
+			}
 		}
 	
 		return false;
@@ -413,17 +364,18 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	 * Returns the specified page, given a nicename.
 	 *
 	 * @param			page nicename
-	 * @return		page content
+	 * @param			(optional) message on non-existing page
+	 * @return		page content string
 	 */
-	function wpp_get_page_content($nicename) {
+	function wpp_get_page_content($nicename, $on_empty = "The page '%s' is empty.") {
 	  $out = '';
-
+		
 	  $posts = wpp_get_posts(array('page' => $nicename));
 	  if ($posts[0]->post_content)
 	    $out = $posts[0]->post_content;
 	  else
-	    $out = 'La pagina "' . $nicename . '" &egrave; da definirsi.';
-
+	    $out = sprintf($on_empty, $nicename);
+		
 	  return $out;
 	}
 
