@@ -117,45 +117,27 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 					" . ($limit ? 'LIMIT ' . $limit : '') . "
 				";
 			
-			if ($__wpp_posts = $wpdb->get_results($query)) {
-				// ****** Take first
-				$post = array_shift($__wpp_posts);
-				$id = $post->ID;
-				$day = mysql2date('d.m.y', $post->post_date);
+			$__wpp_posts = $wpdb->get_results($query);
+		}
 		
-				$out = $post;
-			} else {
-				// ****** No results
-				// *** Reset
-				$post = null;
-				$__wpp_posts = null;
-			
-				// *** Restore backup
-				$post = $__wpp_old_posts;
-				$id = $post->ID;
-				$day = mysql2date('d.m.y', @$post->post_date);
-				$previousday = $__wpp_old_previousday;
-			}
+		// ****** Elaborate the custom The WPP Loop
+		if (is_array($__wpp_posts) && sizeof($__wpp_posts) > 0) {
+			// *** Next
+			$post = array_shift($__wpp_posts);
+			$id = $post->ID;
+			$day = mysql2date('d.m.y', $post->post_date);
+		
+			$out = $post;
 		} else {
-			// ****** We're in the_wpp_loop
-			if (is_array($__wpp_posts) && sizeof($__wpp_posts) > 0) {
-				// *** Next
-				$post = array_shift($__wpp_posts);
-				$id = $post->ID;
-				$day = mysql2date('d.m.y', $post->post_date);
-			
-				$out = $post;
-			} else {
-				// *** Reset
-				$post = null;
-				$__wpp_posts = null;
-			
-				// *** Restore backup
-				$post = $__wpp_old_posts;
-				$id = $post->ID;
-				$day = mysql2date('d.m.y', @$post->post_date);
-				$previousday = $__wpp_old_previousday;
-			}
+			// *** Reset
+			$post = null;
+			$__wpp_posts = null;
+		
+			// *** Restore backup
+			$post = $__wpp_old_posts;
+			$id = $post->ID;
+			$day = mysql2date('d.m.y', @$post->post_date);
+			$previousday = $__wpp_old_previousday;
 		}
 
 		return $out;
@@ -236,45 +218,48 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	 */
 	function wpp_uri_category($field = 'nicename', $default = false) {
 		global $wpdb;
-		global $_kcategory;
+		global $__wpp_category;
 
 		// ****** Init
 		$query = '';
 		$out = $default;
 
-		if (!isset($_kcategory) || !$_kcategory) {
+		if (!isset($__wpp_category) || !$__wpp_category) {
 			// ****** Parsing URL
 			$type = wpp_uri_type();
 			if ($type['type'] == 'page') {
 				// *** We're in a PAGE
+				// Taking the page nicename...
 				$query = "
 					SELECT c.*
 					FROM " . $wpdb->posts . " As p
 					INNER JOIN " . $wpdb->categories . " As c ON p.post_name = c.category_nicename
 					WHERE
-					p.post_status = 'static' AND
-					p.ID = '" . $type['id'] . "'
+						p.post_status = 'static' AND
+						p.ID = '" . $type['id'] . "'
 					LIMIT 1
 					";
 			} else if ($type['type'] == 'post') {
 				// *** We're in a POST
+				// Taking the post category nicename...
 				$query = "
 					SELECT c.*
 					FROM " . $wpdb->posts . " As p
 					INNER JOIN " . $wpdb->post2cat . " As p2c ON p.ID = p2c.post_id
 					INNER JOIN " . $wpdb->categories . " As c ON c.cat_ID = p2c.category_id
 					WHERE
-					p.post_status = 'publish' AND
-					p.ID = '" . $type['id'] . "'
+						p.post_status = 'publish' AND
+						p.ID = '" . $type['id'] . "'
 					LIMIT 1
 					";
 			} else if ($type['type'] == 'cat') {
 				// *** We're in a CATEGORY
+				// Taking the category nicename...
 				$query = "
 					SELECT c.*
 					FROM " . $wpdb->categories . " As c
 					WHERE
-					c.cat_ID = '" . $type['id'] . "'
+						c.cat_ID = '" . $type['id'] . "'
 					LIMIT 1
 					";
 			}
@@ -282,19 +267,19 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 			// ****** Retrieving category
 			if ($categories = $wpdb->get_results($query)) {
 				// *** Exists
-				$_kcategory = $categories[0];
+				$__wpp_category = $categories[0];
 			}
 		}
 
-		// ****** Now $_kcategory should be set...
-		if (isset($_kcategory) || is_array($_kcategory)) {
+		// ****** Now $__wpp_category should be set...
+		if (isset($__wpp_category) || is_array($__wpp_category)) {
 			if ($field == 'id') $field = 'ID';
 		
 			// Handling silly implementation of WP table...
 			if ($field == 'ID' || $field == 'name')
-				$out = $_kcategory->{'cat_' . $field};
+				$out = $__wpp_category->{'cat_' . $field};
 			else
-				$out = $_kcategory->{'category_' . $field};
+				$out = $__wpp_category->{'category_' . $field};
 		}
 	
 		return $out;
