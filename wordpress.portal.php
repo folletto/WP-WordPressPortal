@@ -73,7 +73,6 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 		// ****** Init
 		$out = null;
 		$where = array();
-		$join = '';
 		
 		if (!isset($__wpp_posts) || $__wpp_posts === null) {
 			// *** Backup
@@ -85,13 +84,12 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				foreach ($filter as $key => $value) {
 					if ($key == 'category') {
 						// *** Special: category by nicename
-						$catwhere = array();
-						$categories = wpp_get_terms_recursive($value);
-						foreach ($categories as $category) {
-							$catwhere[] = "p2c.category_id = '" . $category->cat_ID . "'";
+						$catwhere = array("tr.term_taxonomy_id = '0'");
+						$terms = wpp_get_terms_recursive($value);
+						foreach ($terms as $term) {
+							$catwhere[] = "tr.term_taxonomy_id = '" . $term->term_taxonomy_id . "'";
 						}
-						if (sizeof($catwhere))
-							$where[] = '(' . join(' OR ', $catwhere) . ')';
+						$where[] = '(' . join(' OR ', $catwhere) . ')';
 					} else if ($key == 'page') {
 						// *** Special: page by nicename
 						$where[] = "post_name = '" . $value . "'";
@@ -111,7 +109,6 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				SELECT DISTINCT p.*
 				FROM " . $wpdb->posts . " As p
 				INNER JOIN " . $wpdb->term_relationships . " As tr ON tr.object_id = p.ID
-					" . ($join ? $join : '') . "
 				WHERE
 					post_status = 'publish' AND 
 					post_type = '" . (isset($filter['page']) ? "page" : "post") . "'
@@ -192,10 +189,12 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	function wpp_get_terms_recursive($ref, $levels = -1, $taxonomy = 'category') {
 		global $wpdb;
 		
-		if ($nicename !== '') {
+		$out = array();
+		
+		if ($ref !== '') {
 			// ****** Where
 			if (strval($ref) === strval(intval($ref))) {
-				$where = "AND t.term_id = '" . $ref . "'"; // *** INT, use id
+				$where = "AND tt.parent = '" . $ref . "'"; // *** INT, use id
 			} else {
 				$where = "AND t.slug = '" . $ref . "'"; // *** STRING, use slug
 			}
@@ -205,7 +204,6 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				SELECT *
 				FROM " . $wpdb->term_taxonomy . " As tt
 				INNER JOIN " . $wpdb->terms . " As t ON t.term_id = tt.term_id
-				INNER JOIN " . $wpdb->term_relationships . " As tr ON tr.term_taxonomy_id = tt.term_taxonomy_id
 				WHERE
 					tt.taxonomy = '" . $taxonomy . "'
 					" . $where . "
@@ -218,11 +216,13 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 					
 					if ($levels != 0) {
 						$levels--;
-						$out = array_merge($out, wpp_get_terms_recursive($term->parent, $levels, $taxonomy));
+						$out = array_merge($out, wpp_get_terms_recursive($term->term_id, $levels, $taxonomy));
 					}
 				}
 			}
 		}
+		
+		return $out;
 	}
 	
 	/****************************************************************************************************
