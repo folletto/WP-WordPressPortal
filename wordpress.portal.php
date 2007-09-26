@@ -1,14 +1,20 @@
 <?php 
 /*
+Plugin Name: WordPress Portal
+Plugin URI: http://digitalhymn.com/
+Description: This is a function library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
+Author: Davide 'Folletto' Casali
+Version: 0.6
+Author URI: http://digitalhymn.com/
+ ******************************************************************************************
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Version 0.6
- * Last revision: 2007 07 26
+ * Last revision: 2007 09 26
  *
  * by Davide 'Folletto' Casali
  * www.digitalhymn.com
- * Copyright (C) 2006 - Creative Commons (CC) by-sa 2.5
+ * Copyright (C) 2006/2007 - Creative Commons (CC) by-sa 2.5
  * 
  * Based upon a library developed for key-one.it (Kallideas / Key-One)
  *
@@ -40,12 +46,15 @@
  * 
  */
 
-if (!function_exists('wpp_foreach_post')) {
+if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
+	$WPP_VERSION = 'WordPressPortal/0.6';
+	
 	/****************************************************************************************************
-	 * Creates a custom the_loop, the_wppthe_wpp_loop_loop.
-	 * The query filter parameter in array mode filters additional special queries:
-	 * - 'category' => 'name', selects all the posts from a specific category using its nicename
-	 * - 'page' => 'name', retrieves the page defined by its nicename
+	 * Creates a custom The Loop (i.e. like: while (have_posts()) : the_post(); [...] endwhile;).
+	 * 
+	 * The filter parameter in array mode filters additional special queries:
+	 *   'category' => 'name', selects all the posts from a specific category using its nicename (slug)
+	 *   'page' => 'name', retrieves the page defined by its nicename (slug)
 	 *
 	 * @param			filter string (SQL WHERE) or array (converted to SQL WHERE, AND of equals (==))
 	 * @param			limit string (i.e. 1 or 1,10)
@@ -54,30 +63,30 @@ if (!function_exists('wpp_foreach_post')) {
 	function wpp_foreach_post($filter, $limit = null) {
 		global $wpdb;
 		global $__wpp_posts;						// working variables for the_wpp_loop
-	
+		
 		global $__wpp_old_posts;				// backup: possible existing $post
 		global $__wpp_old_previousday;	// backup: possible existing $previousday
-	
-		global $post, $id, $day;				// TheLoop emu: content and working functions
-		global $day, $previousday;			// TheLoop emu: date functions
-
+		
+		global $post, $id, $day;				// TheLoop emulation: content and working functions
+		global $day, $previousday;			// TheLoop emulation: date functions
+		
 		// ****** Init
 		$out = null;
 		$where = array();
 		$join = '';
-
+		
 		if (!isset($__wpp_posts) || $__wpp_posts === null) {
 			// *** Backup
 			$__wpp_old_posts = $post;
 			$__wpp_old_previousday = $previousday;
-		
+			
 			// ****** Building SQL where clause. 
 			if (is_array($filter)) {
 				foreach ($filter as $key => $value) {
 					if ($key == 'category') {
 						// *** Special: category by nicename
 						$catwhere = array();
-						$categories = wpp_get_categories_children_flat_array($value);
+						$categories = wpp_get_terms_recursive($value);
 						foreach ($categories as $category) {
 							$catwhere[] = "p2c.category_id = '" . $category->cat_ID . "'";
 						}
@@ -94,17 +103,18 @@ if (!function_exists('wpp_foreach_post')) {
 				$where = join(' AND ', $where);
 			} else {
 				$where = $filter;
+				$filter = array();
 			}
 		
 			// ****** Querying
 			$query = "
 				SELECT DISTINCT p.*
 				FROM " . $wpdb->posts . " As p
-				INNER JOIN " . $wpdb->post2cat . " As p2c ON p.ID = p2c.post_id
+				INNER JOIN " . $wpdb->term_relationships . " As tr ON tr.object_id = p.ID
 					" . ($join ? $join : '') . "
 				WHERE
 					post_status = 'publish' AND 
-					post_type = '" . ((is_array($filter) && isset($filter['page'])) ? "page" : "post") . "'
+					post_type = '" . (isset($filter['page']) ? "page" : "post") . "'
 					" . ($where ? "AND " . $where : '') . "
 				ORDER BY post_date DESC
 					" . ($limit ? 'LIMIT ' . $limit : '') . "
@@ -170,7 +180,51 @@ if (!function_exists('wpp_foreach_post')) {
 
 		return $posts;
 	}
-
+	
+	/****************************************************************************************************
+	 * Get the terms matching the nicename (slug) and all its CHILDREN in a flat array.
+	 *
+	 * @param			term nicename (slug)
+	 * @param			(optional) depth of recursion (defult: -1, ALL)
+	 * @param			(optional) taxonomy
+	 * @return		array of raw term rows
+	 */
+	function wpp_get_terms_recursive($ref, $levels = -1, $taxonomy = 'category') {
+		global $wpdb;
+		
+		if ($nicename !== '') {
+			// ****** Where
+			if (strval($ref) === strval(intval($ref))) {
+				$where = "AND t.term_id = '" . $ref . "'"; // *** INT, use id
+			} else {
+				$where = "AND t.slug = '" . $ref . "'"; // *** STRING, use slug
+			}
+			
+			// ****** Query
+			$query = "
+				SELECT *
+				FROM " . $wpdb->term_taxonomy . " As tt
+				INNER JOIN " . $wpdb->terms . " As t ON t.term_id = tt.term_id
+				INNER JOIN " . $wpdb->term_relationships . " As tr ON tr.term_taxonomy_id = tt.term_taxonomy_id
+				WHERE
+					tt.taxonomy = '" . $taxonomy . "'
+					" . $where . "
+			";
+			
+			// ****** Data
+			if ($terms = $wpdb->get_results($query)) {
+				foreach ($terms as $term) {
+					$out[] = $term; // Push
+					
+					if ($levels != 0) {
+						$levels--;
+						$out = array_merge($out, wpp_get_terms_recursive($term->parent, $levels, $taxonomy));
+					}
+				}
+			}
+		}
+	}
+	
 	/****************************************************************************************************
 	 * Get the category matching the nicename and all its children in a flat array.
 	 *
