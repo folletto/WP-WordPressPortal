@@ -1,7 +1,7 @@
 <?php 
 /*
 Plugin Name: WordPress Portal
-Plugin URI: http://digitalhymn.com/
+Plugin URI: http://digitalhymn.com/argilla/wpp
 Description: This is a function library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
 Version: 0.6
@@ -206,85 +206,7 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 		
 		return $out;
 	}
-
-	/****************************************************************************************************
-	 * Retrieve the current URI related category.
-	 * If the URI asks for a "post", the category will be the category's post.
-	 * If the URI asks for a "page", the category will be the page's nicename.
-	 * If the URI asks for a "category", the category will be... that one.
-	 *
-	 * @param			category field (def: 'nicename') [nicename, name, ID, description]
-	 * @return		category value
-	 */
-	function wpp_uri_category($field = 'nicename', $default = false) {
-		global $wpdb;
-		global $__wpp_category;
-
-		// ****** Init
-		$query = '';
-		$out = $default;
-
-		if (!isset($__wpp_category) || !$__wpp_category) {
-			// ****** Parsing URL
-			$type = wpp_uri_type();
-			if ($type['type'] == 'page') {
-				// *** We're in a PAGE
-				// Taking the page nicename...
-				$query = "
-					SELECT c.*
-					FROM " . $wpdb->posts . " As p
-					INNER JOIN " . $wpdb->categories . " As c ON p.post_name = c.category_nicename
-					WHERE
-						p.post_status = 'static' AND
-						p.ID = '" . $type['id'] . "'
-					LIMIT 1
-					";
-			} else if ($type['type'] == 'post') {
-				// *** We're in a POST
-				// Taking the post category nicename...
-				$query = "
-					SELECT c.*
-					FROM " . $wpdb->posts . " As p
-					INNER JOIN " . $wpdb->post2cat . " As p2c ON p.ID = p2c.post_id
-					INNER JOIN " . $wpdb->categories . " As c ON c.cat_ID = p2c.category_id
-					WHERE
-						p.post_status = 'publish' AND
-						p.ID = '" . $type['id'] . "'
-					LIMIT 1
-					";
-			} else if ($type['type'] == 'cat') {
-				// *** We're in a CATEGORY
-				// Taking the category nicename...
-				$query = "
-					SELECT c.*
-					FROM " . $wpdb->categories . " As c
-					WHERE
-						c.cat_ID = '" . $type['id'] . "'
-					LIMIT 1
-					";
-			}
-		
-			// ****** Retrieving category
-			if ($categories = $wpdb->get_results($query)) {
-				// *** Exists
-				$__wpp_category = $categories[0];
-			}
-		}
-
-		// ****** Now $__wpp_category should be set...
-		if (isset($__wpp_category) || is_array($__wpp_category)) {
-			if ($field == 'id') $field = 'ID';
-		
-			// Handling silly implementation of WP table...
-			if ($field == 'ID' || $field == 'name')
-				$out = $__wpp_category->{'cat_' . $field};
-			else
-				$out = $__wpp_category->{'category_' . $field};
-		}
 	
-		return $out;
-	}
-
 	/****************************************************************************************************
 	 * Checks if the post in the_loop belongs to the specified category nicename.
 	 * Different from in_category(), that checks for the id, not for the nicename.
@@ -365,34 +287,59 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	}
 
 	/****************************************************************************************************
-	 * Return the type of the 'section' where we are and the matching id.
-	 * - types: page, post
+	 * Return the type of the 'zone' where we are and the matching id reference.
+	 * It's like a normalized is_page/is_single/... with matching id.
+	 * - types: page, post, author, search, category, date, tag, home
 	 *
 	 * @return		array ('type' => '...', 'id' => 'n')
 	 */
-	function wpp_uri_type() {
+	function wpp_get_zone() {
 		$out = array(
 			'type'  => 'none',
 			'id'    => 0
 			);
-
-		if ($_GET['page_id']) {
+				
+		if (is_page()) {
 			// *** We're in a PAGE
+			global $post;
 			$out = array(
 				'type'  => 'page',
-				'id'    => $_GET['page_id']
+				'id'    => $post->ID
 				);
-		} else if ($_GET['p']) {
+		} else if (is_single()) {
 			// *** We're in a POST
+			global $post;
 			$out = array(
 				'type'  => 'post',
-				'id'    => $_GET['p']
+				'id'    => $post->ID
 				);
-		} else if ($_GET['cat']) {
+		} else if (is_author()) {
+			// *** We're in AUTHOR
+			global $author;
+			$out = array(
+				'type'  => 'author',
+				'id'    => $author
+				);
+		} else if (is_search()) {
+			// *** We're in a SEARCH
+			global $s;
+			$out = array(
+				'type'  => 'search',
+				'id'    => $s
+				);
+		} else if (is_category()) {
 			// *** We're in a CATEGORY
+			global $cat;
 			$out = array(
 				'type'  => 'cat',
-				'id'    => $_GET['cat']
+				'id'    => $cat
+				);
+		} else if (is_date()) {
+			// *** We're in a DATE
+			global $year;
+			$out = array(
+				'type'  => 'date',
+				'id'    => $year
 				);
 		} else if ($_GET['tag']) {
 			// *** We're in a TAG
@@ -400,8 +347,93 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				'type'  => 'tag',
 				'id'    => $_GET['tag']
 				);
+		} else if (is_home()) {
+			// *** We're in HOME
+			global $paged;
+			$out = array(
+				'type'  => 'home',
+				'id'    => (intval($paged) ? intval($paged) : 1)
+				);
 		}
 
+		return $out;
+	}
+	
+	/****************************************************************************************************
+	 * Retrieve the current URI related category.
+	 * If the URI asks for a "post", the category will be the category's post.
+	 * If the URI asks for a "page", the category will be the page's nicename.
+	 * If the URI asks for a "category", the category will be... that one.
+	 *
+	 * @param			category field (def: 'nicename') [nicename, name, ID, description]
+	 * @return		category value
+	 */
+	function wpp_uri_category($field = 'nicename', $default = false) {
+		global $wpdb;
+		global $__wpp_category;
+
+		// ****** Init
+		$query = '';
+		$out = $default;
+
+		if (!isset($__wpp_category) || !$__wpp_category) {
+			// ****** Parsing URL
+			$type = wpp_is_section();
+			if ($type['type'] == 'page') {
+				// *** We're in a PAGE
+				// Taking the page nicename...
+				$query = "
+					SELECT c.*
+					FROM " . $wpdb->posts . " As p
+					INNER JOIN " . $wpdb->categories . " As c ON p.post_name = c.category_nicename
+					WHERE
+						p.post_status = 'static' AND
+						p.ID = '" . $type['id'] . "'
+					LIMIT 1
+					";
+			} else if ($type['type'] == 'post') {
+				// *** We're in a POST
+				// Taking the post category nicename...
+				$query = "
+					SELECT c.*
+					FROM " . $wpdb->posts . " As p
+					INNER JOIN " . $wpdb->post2cat . " As p2c ON p.ID = p2c.post_id
+					INNER JOIN " . $wpdb->categories . " As c ON c.cat_ID = p2c.category_id
+					WHERE
+						p.post_status = 'publish' AND
+						p.ID = '" . $type['id'] . "'
+					LIMIT 1
+					";
+			} else if ($type['type'] == 'cat') {
+				// *** We're in a CATEGORY
+				// Taking the category nicename...
+				$query = "
+					SELECT c.*
+					FROM " . $wpdb->categories . " As c
+					WHERE
+						c.cat_ID = '" . $type['id'] . "'
+					LIMIT 1
+					";
+			}
+		
+			// ****** Retrieving category
+			if ($categories = $wpdb->get_results($query)) {
+				// *** Exists
+				$__wpp_category = $categories[0];
+			}
+		}
+
+		// ****** Now $__wpp_category should be set...
+		if (isset($__wpp_category) || is_array($__wpp_category)) {
+			if ($field == 'id') $field = 'ID';
+		
+			// Handling silly implementation of WP table...
+			if ($field == 'ID' || $field == 'name')
+				$out = $__wpp_category->{'cat_' . $field};
+			else
+				$out = $__wpp_category->{'category_' . $field};
+		}
+	
 		return $out;
 	}
 
