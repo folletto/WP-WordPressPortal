@@ -291,8 +291,8 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	 * It's like a normalized is_page/is_single/... with matching id.
 	 * - types: page, post, author, search, category, date, tag, home
 	 *
-	 * @param			(optional) array shortcut (i.e. wpp_get-zone('id'))
-	 * @return		array ['type' => '...', 'id' => 'n', 'term' => array(...)]
+	 * @param			(optional) array shortcut (i.e. wpp_get_zone('id'))
+	 * @return		array ['type' => '...', 'id' => 'n', 'terms' => array(...)]
 	 */
 	function wpp_get_zone($key = null) {
 		$out = array(
@@ -308,7 +308,7 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				global $post;
 				$out['type'] = 'page';
 				$out['id'] = $post->ID;
-				$out['terms'] = $post->post_name;
+				$out['terms'] = array(get_term_by('slug', $post->post_name, 'category'));
 			} else if (is_single()) {
 				// *** We're in a POST
 				global $post;
@@ -345,6 +345,11 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				global $paged;
 				$out['type'] = 'home';
 				$out['id'] = (intval($paged) ? intval($paged) : 1);
+			} else if (is_404()) {
+				// *** We're in 404
+				global $paged;
+				$out['type'] = '404';
+				$out['id'] = '';
 			}
 			
 			$__cache_wpp_get_zone = $out; // <-- Cache
