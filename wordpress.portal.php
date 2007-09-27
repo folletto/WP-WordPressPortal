@@ -333,10 +333,10 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				$out['id'] = $cat;
 				$out['terms'] = array(get_term($cat, 'category'));
 			} else if (is_date()) {
-				// *** We're in a DATE (TODO: doesn't work without mod_rewrite)
-				global $year;
+				// *** We're in a DATE
+				global $m, $year, $monthnum;
 				$out['type'] = 'date';
-				$out['id'] = $year;
+				$out['id'] = ($m ? $m : $year . str_pad($monthnum, 2, '0', STR_PAD_LEFT));
 			} else if (is_tag()) {
 				// *** We're in a TAG
 				global $tag;
