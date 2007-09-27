@@ -292,12 +292,13 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	 * - types: page, post, author, search, category, date, tag, home
 	 *
 	 * @param			(optional) array shortcut (i.e. wpp_get-zone('id'))
-	 * @return		array ('type' => '...', 'id' => 'n')
+	 * @return		array ['type' => '...', 'id' => 'n', 'term' => array(...)]
 	 */
 	function wpp_get_zone($key = null) {
 		$out = array(
 			'type'  => 'none',
-			'id'    => 0
+			'id'    => 0,
+			'terms'	=> array()
 			);
 		
 		global $__cache_wpp_get_zone; // Cache
@@ -305,58 +306,45 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 			if (is_page()) {
 				// *** We're in a PAGE
 				global $post;
-				$out = array(
-					'type'  => 'page',
-					'id'    => $post->ID
-					);
+				$out['type'] = 'page';
+				$out['id'] = $post->ID;
+				$out['terms'] = $post->post_name;
 			} else if (is_single()) {
 				// *** We're in a POST
 				global $post;
-				$out = array(
-					'type'  => 'post',
-					'id'    => $post->ID
-					);
+				$out['type'] = 'page';
+				$out['id'] = $post->ID;
+				$out['terms'] = wp_get_object_terms($post->ID, 'category');
 			} else if (is_author()) {
 				// *** We're in AUTHOR
 				global $author;
-				$out = array(
-					'type'  => 'author',
-					'id'    => $author
-					);
+				$out['type'] = 'author';
+				$out['id'] = $author;
 			} else if (is_search()) {
 				// *** We're in a SEARCH
 				global $s;
-				$out = array(
-					'type'  => 'search',
-					'id'    => $s
-					);
+				$out['type'] = 'search';
+				$out['id'] = $s;
 			} else if (is_category()) {
 				// *** We're in a CATEGORY
 				global $cat;
-				$out = array(
-					'type'  => 'cat',
-					'id'    => $cat
-					);
+				$out['type'] = 'cat';
+				$out['id'] = $cat;
+				$out['terms'] = array(get_term($cat, 'category'));
 			} else if (is_date()) {
 				// *** We're in a DATE
 				global $year;
-				$out = array(
-					'type'  => 'date',
-					'id'    => $year
-					);
+				$out['type'] = 'date';
+				$out['id'] = $year;
 			} else if ($_GET['tag']) {
 				// *** We're in a TAG
-				$out = array(
-					'type'  => 'tag',
-					'id'    => $_GET['tag']
-					);
+				$out['type'] = 'tag';
+				$out['id'] = $_GET['tag'];
 			} else if (is_home()) {
 				// *** We're in HOME
 				global $paged;
-				$out = array(
-					'type'  => 'home',
-					'id'    => (intval($paged) ? intval($paged) : 1)
-					);
+				$out['type'] = 'home';
+				$out['id'] = (intval($paged) ? intval($paged) : 1);
 			}
 			
 			$__cache_wpp_get_zone = $out; // <-- Cache
@@ -367,84 +355,6 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 		// ****** Return
 		if ($key === null) return $out;
 		return $out[$key];
-	}
-	
-	/****************************************************************************************************
-	 * Retrieve the current URI related category.
-	 * If the URI asks for a "post", the category will be the category's post.
-	 * If the URI asks for a "page", the category will be the page's nicename.
-	 * If the URI asks for a "category", the category will be... that one.
-	 *
-	 * @param			category field (def: 'nicename') [nicename, name, ID, description]
-	 * @return		category value
-	 */
-	function wpp_uri_category($field = 'nicename', $default = false) {
-		global $wpdb;
-		global $__wpp_category;
-
-		// ****** Init
-		$query = '';
-		$out = $default;
-
-		if (!isset($__wpp_category) || !$__wpp_category) {
-			// ****** Parsing URL
-			$type = wpp_is_section();
-			if ($type['type'] == 'page') {
-				// *** We're in a PAGE
-				// Taking the page nicename...
-				$query = "
-					SELECT c.*
-					FROM " . $wpdb->posts . " As p
-					INNER JOIN " . $wpdb->categories . " As c ON p.post_name = c.category_nicename
-					WHERE
-						p.post_status = 'static' AND
-						p.ID = '" . $type['id'] . "'
-					LIMIT 1
-					";
-			} else if ($type['type'] == 'post') {
-				// *** We're in a POST
-				// Taking the post category nicename...
-				$query = "
-					SELECT c.*
-					FROM " . $wpdb->posts . " As p
-					INNER JOIN " . $wpdb->post2cat . " As p2c ON p.ID = p2c.post_id
-					INNER JOIN " . $wpdb->categories . " As c ON c.cat_ID = p2c.category_id
-					WHERE
-						p.post_status = 'publish' AND
-						p.ID = '" . $type['id'] . "'
-					LIMIT 1
-					";
-			} else if ($type['type'] == 'cat') {
-				// *** We're in a CATEGORY
-				// Taking the category nicename...
-				$query = "
-					SELECT c.*
-					FROM " . $wpdb->categories . " As c
-					WHERE
-						c.cat_ID = '" . $type['id'] . "'
-					LIMIT 1
-					";
-			}
-		
-			// ****** Retrieving category
-			if ($categories = $wpdb->get_results($query)) {
-				// *** Exists
-				$__wpp_category = $categories[0];
-			}
-		}
-
-		// ****** Now $__wpp_category should be set...
-		if (isset($__wpp_category) || is_array($__wpp_category)) {
-			if ($field == 'id') $field = 'ID';
-		
-			// Handling silly implementation of WP table...
-			if ($field == 'ID' || $field == 'name')
-				$out = $__wpp_category->{'cat_' . $field};
-			else
-				$out = $__wpp_category->{'category_' . $field};
-		}
-	
-		return $out;
 	}
 
 	/****************************************************************************************************
