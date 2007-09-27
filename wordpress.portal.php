@@ -291,72 +291,82 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 	 * It's like a normalized is_page/is_single/... with matching id.
 	 * - types: page, post, author, search, category, date, tag, home
 	 *
+	 * @param			(optional) array shortcut (i.e. wpp_get-zone('id'))
 	 * @return		array ('type' => '...', 'id' => 'n')
 	 */
-	function wpp_get_zone() {
+	function wpp_get_zone($key = null) {
 		$out = array(
 			'type'  => 'none',
 			'id'    => 0
 			);
-				
-		if (is_page()) {
-			// *** We're in a PAGE
-			global $post;
-			$out = array(
-				'type'  => 'page',
-				'id'    => $post->ID
-				);
-		} else if (is_single()) {
-			// *** We're in a POST
-			global $post;
-			$out = array(
-				'type'  => 'post',
-				'id'    => $post->ID
-				);
-		} else if (is_author()) {
-			// *** We're in AUTHOR
-			global $author;
-			$out = array(
-				'type'  => 'author',
-				'id'    => $author
-				);
-		} else if (is_search()) {
-			// *** We're in a SEARCH
-			global $s;
-			$out = array(
-				'type'  => 'search',
-				'id'    => $s
-				);
-		} else if (is_category()) {
-			// *** We're in a CATEGORY
-			global $cat;
-			$out = array(
-				'type'  => 'cat',
-				'id'    => $cat
-				);
-		} else if (is_date()) {
-			// *** We're in a DATE
-			global $year;
-			$out = array(
-				'type'  => 'date',
-				'id'    => $year
-				);
-		} else if ($_GET['tag']) {
-			// *** We're in a TAG
-			$out = array(
-				'type'  => 'tag',
-				'id'    => $_GET['tag']
-				);
-		} else if (is_home()) {
-			// *** We're in HOME
-			global $paged;
-			$out = array(
-				'type'  => 'home',
-				'id'    => (intval($paged) ? intval($paged) : 1)
-				);
+		
+		global $__cache_wpp_get_zone; // Cache
+		if (!is_array($__cache_wpp_get_zone)) {
+			if (is_page()) {
+				// *** We're in a PAGE
+				global $post;
+				$out = array(
+					'type'  => 'page',
+					'id'    => $post->ID
+					);
+			} else if (is_single()) {
+				// *** We're in a POST
+				global $post;
+				$out = array(
+					'type'  => 'post',
+					'id'    => $post->ID
+					);
+			} else if (is_author()) {
+				// *** We're in AUTHOR
+				global $author;
+				$out = array(
+					'type'  => 'author',
+					'id'    => $author
+					);
+			} else if (is_search()) {
+				// *** We're in a SEARCH
+				global $s;
+				$out = array(
+					'type'  => 'search',
+					'id'    => $s
+					);
+			} else if (is_category()) {
+				// *** We're in a CATEGORY
+				global $cat;
+				$out = array(
+					'type'  => 'cat',
+					'id'    => $cat
+					);
+			} else if (is_date()) {
+				// *** We're in a DATE
+				global $year;
+				$out = array(
+					'type'  => 'date',
+					'id'    => $year
+					);
+			} else if ($_GET['tag']) {
+				// *** We're in a TAG
+				$out = array(
+					'type'  => 'tag',
+					'id'    => $_GET['tag']
+					);
+			} else if (is_home()) {
+				// *** We're in HOME
+				global $paged;
+				$out = array(
+					'type'  => 'home',
+					'id'    => (intval($paged) ? intval($paged) : 1)
+					);
+			}
+			
+			$__cache_wpp_get_zone = $out; // <-- Cache
+		} else {
+			$out = $__cache_wpp_get_zone; // --> Cache
 		}
-
-		return $out;
+		
+		// ****** Return
+		if ($key === null) return $out;
+		return $out[$key];
 	}
 	
 	/****************************************************************************************************
