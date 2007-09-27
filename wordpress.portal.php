@@ -309,6 +309,7 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				$out['type'] = 'page';
 				$out['id'] = $post->ID;
 				$out['terms'] = array(get_term_by('slug', $post->post_name, 'category'));
+				if ($out['terms'][0] == false) $out['terms'] = array();
 			} else if (is_single()) {
 				// *** We're in a POST
 				global $post;
@@ -332,14 +333,15 @@ if (!function_exists('wpp_foreach_post') && !isset($WPP_VERSION)) {
 				$out['id'] = $cat;
 				$out['terms'] = array(get_term($cat, 'category'));
 			} else if (is_date()) {
-				// *** We're in a DATE
+				// *** We're in a DATE (TODO: doesn't work without mod_rewrite)
 				global $year;
 				$out['type'] = 'date';
 				$out['id'] = $year;
-			} else if ($_GET['tag']) {
+			} else if (is_tag()) {
 				// *** We're in a TAG
+				global $tag;
 				$out['type'] = 'tag';
-				$out['id'] = $_GET['tag'];
+				$out['id'] = $tag;
 			} else if (is_home()) {
 				// *** We're in HOME
 				global $paged;
