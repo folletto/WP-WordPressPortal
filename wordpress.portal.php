@@ -10,7 +10,7 @@ Author URI: http://digitalhymn.com/
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Last revision: 2007 09 26
+ * Last revision: 2007 09 27
  *
  * by Davide 'Folletto' Casali
  * www.digitalhymn.com
