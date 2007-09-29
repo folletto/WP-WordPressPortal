@@ -88,7 +88,7 @@ if (!isset($WPP_VERSION)) {
 						if ($key == 'category') {
 							// *** Special: category by nicename
 							$catwhere = array("tr.term_taxonomy_id = '0'");
-							$terms = wpp_get_terms_recursive($value);
+							$terms = wpp::get_terms_recursive($value);
 							foreach ($terms as $term) {
 								$catwhere[] = "tr.term_taxonomy_id = '" . $term->term_taxonomy_id . "'";
 							}
@@ -156,7 +156,7 @@ if (!isset($WPP_VERSION)) {
 		function get_posts($filter, $limit = null) {
 			$posts = array();
 
-			while ($post = wpp_foreach_post($filter, $limit)) {
+			while ($post = wpp::foreach_post($filter, $limit)) {
 				$posts[] = $post;
 			}
 
@@ -201,7 +201,7 @@ if (!isset($WPP_VERSION)) {
 					
 						if ($levels != 0) {
 							$levels--;
-							$out = array_merge($out, wpp_get_terms_recursive($term->term_id, $levels, $taxonomy));
+							$out = array_merge($out, wpp::get_terms_recursive($term->term_id, $levels, $taxonomy));
 						}
 					}
 				}
@@ -219,7 +219,7 @@ if (!isset($WPP_VERSION)) {
 		 * @return	boolean
 		 */
 		function in_category($nicename) {
-			return wpp_is_term_child_of($nicename, get_the_category());
+			return wpp::is_term_child_of($nicename, get_the_category());
 		}
 
 		/****************************************************************************************************
@@ -233,7 +233,7 @@ if (!isset($WPP_VERSION)) {
 			if (is_array($parent_term)) {
 				$terms = $parent_term;
 			} else {
-				$terms = wpp_get_terms_recursive(strval($parent_term));
+				$terms = wpp::get_terms_recursive(strval($parent_term));
 			}
 
 			foreach ($terms as $term) {
@@ -280,7 +280,7 @@ if (!isset($WPP_VERSION)) {
 		function get_page_content($nicename, $on_empty = "The page '%s' is empty.") {
 		  $out = '';
 		
-		  $posts = wpp_get_posts(array('page' => $nicename));
+		  $posts = wpp::get_posts(array('page' => $nicename));
 		  if ($posts[0]->post_content)
 		    $out = $posts[0]->post_content;
 		  else
@@ -529,20 +529,18 @@ if (!isset($WPP_VERSION)) {
 		}
 		
 		/****************************************************************************************************
-		 * Echoes (HTML) the pages under the same parent page.
+		 * Returns the page at the top of the current pages subtree.
 		 * Copyright (C) 2007 + GNU/GPL2 by Roberto Ostinelli [http://www.ostinelli.net]
+		 * Modified by Davide 'Folletto' Casali.
 		 * 
-		 * @param		(optional) formatting arguments for wp_list_pages()
-		 * @param		(optional) boolean false to disable echo and trigger return data behaviour
-		 * @return	(optional) if echo param is false, returns array('root', 'title', 'has_menu')
+		 * @return	returns array('root', 'levels'), where root is a partial page object.
 		 */
-		function list_pages_of_section($arguments = '&title_li=', $echo = true) {
+		function get_pages_root() {
 			global $wp_query, $wpdb, $post;
 			
 			$out = array(
-				'root' => 0,
-				'title' => '',
-				'has_menu' => false
+				'page' => null,
+				'levels' => 0
 			);
 			
 			global $__cache_wpp_list_pages_of_section; // Cache
@@ -550,51 +548,22 @@ if (!isset($WPP_VERSION)) {
 				// *** Get all the pages
 				$query = "
 					SELECT ID, post_parent, post_title, post_name, post_type
-					FROM $wpdb->posts WHERE post_type = 'page'
+					FROM $wpdb->posts WHERE post_type = 'page' AND post_status = 'publish'
 				";
-				if ($post->ID && $results = $wpdb->get_results($query)) {
+				if ($post->post_type == 'page' && $results = $wpdb->get_results($query)) {
 					// *** Generate (key, value) pairs
 					$pages = array();
 					foreach ($results as $result) {
-						if ($result->post_type == 'page') {
-							$pages[$result->ID] = $result;
-						}
+						$pages[$result->ID] = $result;
 					}
-					// *** Walk the "tree" backward
-					$cur_page = $post->post_parent;
-					$cur_title = $pages[$cur_page]->post_title;
-					while($cur_page) {
-						if ($pages[$cur_page]->post_parent == 0) {
-							break;
-						} else {
-							$cur_page = $pages[$cur_page]->post_parent;
-							$cur_title = $pages[$cur_page]->post_title;
-						}
+					// *** Walk the "tree" up to root
+					$root = $post;
+					while($root->post_parent) {
+						$root = $pages[$root->post_parent];
+						$out['levels']++;
 					}
 			
-					// *** Returns parent if any, otherwise returns self
-					if($cur_page == 0) {
-						$parent = $post->ID;
-						$cur_title = $post->post_title;
-						// *** Check if page has any childs
-						$query = "
-							SELECT count(*) as totalcount
-							FROM $wpdb->posts
-							WHERE post_type = 'page' AND post_parent = " . $parent . "
-						";
-						if ($sql = $wpdb->get_results($query)) {
-							if ($sql[0]->totalcount > 0) {
-								// has no childs, do not show block
-								$out['has_menu'] = true;
-							}
-						}
-					} else {
-						$out['has_menu'] = true;
-						$parent = $cur_page;
-					}
-				
-					$out['root'] = $parent; // parent id if any, otherwise self
-					$out['title'] = $cur_title; // parent title
+					$out['page'] = $root;
 				}
 				
 				$__cache_wpp_list_pages_of_section = $out; // <-- Cache
@@ -603,12 +572,23 @@ if (!isset($WPP_VERSION)) {
 			}
 			
 			// ****** Closing
-			if ($echo) {
-				wp_list_pages($arguments . "&child_of=" . $out['root']);
-			} else {
-				return $out;
-			}
+			return $out;
 		}
+		
+		/****************************************************************************************************
+		 * Echoes (HTML) the pages under the same parent page.
+		 * Copyright (C) 2007 + GNU/GPL2 by Roberto Ostinelli [http://www.ostinelli.net]
+		 * Modified by Davide 'Folletto' Casali.
+		 * 
+		 * @param		(optional) formatting arguments for wp_list_pages()
+		 * @param		(optional) boolean false to disable echo and trigger return data behaviour
+		 */
+		function list_pages_of_section($arguments = '&title_li=') {
+			$root = wpp::get_pages_root();
+			return wp_list_pages($arguments . "&child_of=" . $root['page']->ID);
+		}
+		
+		// /\ END OF CLASS
 	}
 }
 
