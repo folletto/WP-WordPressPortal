@@ -10,7 +10,7 @@ Author URI: http://digitalhymn.com/
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Last revision: 2007 09 28
+ * Last revision: 2007 10 03
  *
  * by Davide 'Folletto' Casali
  * www.digitalhymn.com
@@ -30,20 +30,23 @@ Author URI: http://digitalhymn.com/
  *  wpp::is_term_child_of($child, $parent): checks if the category is child of another (nicename)
  *  wpp::get_post_custom($custom, $before, $after, $optid): [TheLoop] gets the specified custom
  *  wpp::get_page_content($nicename, $on_empty): gets the specified page content
+ *  wpp::get_zone(): gets an array containing ['type' => '...', 'id' => 'n', 'terms' => array(...)]
  *  wpp::is_admin($userid): check if the current logged user is an "administrator"
  *  wpp::get_last_comments($size): gets all the last comments
  *  wpp::get_last_comments_grouped($size): gets the last comments, one comment per post
+ *  wpp::get_pages_root(): gets the root page of the current page subtree
+ *  wpp::list_pages_of_section(): like wp_list_pages() but getting only the pages of the section
  * 
  * DETAILS:
  * The most interesting function is the wpp_foreach_post() that in fact creates a custom
  * "The Loop", using the syntax:
- *          while($post = wpp_foreach_post($filter, $limit)) { ... }
+ *          while($post = wpp::foreach_post($filter, $limit)) { ... }
  * 
- * The function uri_category() retrieves the correct category from the page currently loaded.
- *  If the uri opens a category, it returns the nicename of the category.
- *  If the uri opens a page, it returns the page nicename.
- *  If the uri opens a post, it returns the post category.
- * This is *really* useful to create complex sites, using the page hierarchy as structure.
+ * The function wpp::get_zone() retrieves the correct term from the page currently loaded.
+ * For every loaded page it tries to match a tag (from the 'category' taxonomy).
+ * It is like an evolved $wp_query->get_queried_object_id().
+ * This is *really* useful to create complex sites, using the page hierarchy as structure,
+ * matching the page slug with a category slug, using the page content as the section body.
  * 
  */
 
