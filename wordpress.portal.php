@@ -4,13 +4,13 @@ Plugin Name: WordPress Portal
 Plugin URI: http://digitalhymn.com/argilla/wpp
 Description: This is a function library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
-Version: 0.7
+Version: 0.7.1
 Author URI: http://digitalhymn.com/
  ******************************************************************************************
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Last revision: 2007 10 03
+ * Last revision: 2008 05 15
  *
  * by Davide 'Folletto' Casali
  * www.digitalhymn.com
@@ -51,7 +51,7 @@ Author URI: http://digitalhymn.com/
  */
 
 if (!isset($WPP_VERSION)) {
-	$WPP_VERSION = 'WordPressPortal/0.7';
+	$WPP_VERSION = 'WordPressPortal/0.7.1';
 
 	class wpp {
 	
@@ -68,13 +68,13 @@ if (!isset($WPP_VERSION)) {
 		 */
 		function foreach_post($filter, $limit = null) {
 			global $wpdb;
-			global $__wpp_posts;						// working variables for the_wpp_loop
-		
-			global $__wpp_old_posts;				// backup: possible existing $post
-			global $__wpp_old_previousday;	// backup: possible existing $previousday
-		
-			global $post, $id, $day;				// TheLoop emulation: content and working functions
-			global $day, $previousday;			// TheLoop emulation: date functions
+			// Working variables for The WPP Loop
+			global $__wpp_posts;
+			// Backups
+			global $__wpp_old_posts; // backup: possible existing $post
+			global $__wpp_old_previousday; // backup: possible existing $previousday
+			// TheLoop emulation variables
+			global $post, $previousday;
 		
 			// ****** Init
 			$out = null;
@@ -130,8 +130,7 @@ if (!isset($WPP_VERSION)) {
 			if (is_array($__wpp_posts) && sizeof($__wpp_posts) > 0) {
 				// *** Next
 				$post = array_shift($__wpp_posts);
-				$id = $post->ID;
-				$day = mysql2date('d.m.y', $post->post_date);
+				setup_postdata($post); // WP hook
 		
 				$out = $post;
 			} else {
@@ -141,8 +140,7 @@ if (!isset($WPP_VERSION)) {
 		
 				// *** Restore backup
 				$post = $__wpp_old_posts;
-				$id = $post->ID;
-				$day = mysql2date('d.m.y', @$post->post_date);
+				setup_postdata($post); // WP hook
 				$previousday = $__wpp_old_previousday;
 			}
 
