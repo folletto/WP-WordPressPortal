@@ -12,7 +12,7 @@ Author URI: http://digitalhymn.com/
  * 
  * Last revision: 2009 01 18
  *
- * by Davide 'Folletto' Casali
+ * by Davide 'Folletto' Casali <folletto AT gmail DOT com>
  * www.digitalhymn.com
  * Copyright (C) 2006/2007 - Creative Commons (CC) by-sa 2.5
  * 
