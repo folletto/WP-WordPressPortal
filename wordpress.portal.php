@@ -4,7 +4,7 @@ Plugin Name: WordPress Portal
 Plugin URI: http://digitalhymn.com/argilla/wpp
 Description: This is a function library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
-Version: 0.7.1
+Version: 0.7.2
 Author URI: http://digitalhymn.com/
  ******************************************************************************************
  * WordPress Portal
@@ -29,6 +29,7 @@ Author URI: http://digitalhymn.com/
  *  wpp::in_category($nicename): [TheLoop] checks if the posts belongs to that category
  *  wpp::is_term_child_of($child, $parent): checks if the category is child of another (nicename)
  *  wpp::get_post_custom($custom, $before, $after, $optid): [TheLoop] gets the specified custom
+ *  wpp::get_attachment(): [TheLoop] gets the specified attachment
  *  wpp::get_page_content($nicename, $on_empty): gets the specified page content
  *  wpp::get_zone(): gets an array containing ['type' => '...', 'id' => 'n', 'terms' => array(...)]
  *  wpp::is_admin($userid): check if the current logged user is an "administrator"
@@ -55,18 +56,18 @@ if (!isset($WPP_VERSION)) {
 
 	class wpp {
 	
-		/****************************************************************************************************
-		 * Creates a custom The Loop (i.e. like: while (have_posts()) : the_post(); [...] endwhile;).
-		 * 
-		 * The filter parameter in array mode filters additional special queries:
-		 *   'category' => 'name', selects all the posts from a specific category using its nicename (slug)
-		 *   'page' => 'name', retrieves the page defined by its nicename (slug)
-		 *
-		 * @param			filter string (SQL WHERE) or array (converted to SQL WHERE, AND of equals (==))
-		 * @param			limit string (i.e. 1 or 1,10)
-		 * @return		single post array
-		 */
 		function foreach_post($filter, $limit = null) {
+			/****************************************************************************************************
+			 * Creates a custom The Loop (i.e. like: while (have_posts()) : the_post(); [...] endwhile;).
+			 * 
+			 * The filter parameter in array mode filters additional special queries:
+			 *   'category' => 'name', selects all the posts from a specific category using its nicename (slug)
+			 *   'page' => 'name', retrieves the page defined by its nicename (slug)
+			 *
+			 * @param			filter string (SQL WHERE) or array (converted to SQL WHERE, AND of equals (==))
+			 * @param			limit string (i.e. 1 or 1,10)
+			 * @return		single post array
+			 */
 			global $wpdb;
 			// Working variables for The WPP Loop
 			global $__wpp_posts;
@@ -146,15 +147,14 @@ if (!isset($WPP_VERSION)) {
 
 			return $out;
 		}
-
-		/****************************************************************************************************
-		 * Gets all the posts into an array. Wraps wpp_foreach_post().
-		 *
-		 * @param			filter string (SQL WHERE) or array (converted to SQL WHERE, AND of equals (==))
-		 * @param			limit string (i.e. 1 or 1,10)
-		 * @return		posts array
-		 */
 		function get_posts($filter, $limit = null) {
+			/****************************************************************************************************
+			 * Gets all the posts into an array. Wraps wpp_foreach_post().
+			 *
+			 * @param			filter string (SQL WHERE) or array (converted to SQL WHERE, AND of equals (==))
+			 * @param			limit string (i.e. 1 or 1,10)
+			 * @return		posts array
+			 */
 			$posts = array();
 
 			while ($post = wpp::foreach_post($filter, $limit)) {
@@ -163,16 +163,16 @@ if (!isset($WPP_VERSION)) {
 
 			return $posts;
 		}
-	
-		/****************************************************************************************************
-		 * Get the terms matching the nicename (slug) and all its CHILDREN in a flat array.
-		 *
-		 * @param			term nicename (slug)
-		 * @param			(optional) depth of recursion (defult: -1, ALL)
-		 * @param			(optional) taxonomy, defaults to 'category'
-		 * @return		array of raw term rows
-		 */
+		
 		function get_terms_recursive($ref, $levels = -1, $taxonomy = 'category') {
+			/****************************************************************************************************
+			 * Get the terms matching the nicename (slug) and all its CHILDREN in a flat array.
+			 *
+			 * @param			term nicename (slug)
+			 * @param			(optional) depth of recursion (defult: -1, ALL)
+			 * @param			(optional) taxonomy, defaults to 'category'
+			 * @return		array of raw term rows
+			 */
 			global $wpdb;
 		
 			$out = array();
@@ -210,27 +210,25 @@ if (!isset($WPP_VERSION)) {
 		
 			return $out;
 		}
-	
-		/****************************************************************************************************
-		 * Checks if the post in the_loop belongs to the specified category nicename.
-		 * Different from in_category(), that checks for the id, not for the nicename.
-		 *
-		 * @param		container category nicename (slug)
-		 * @param		(optional) optional parent nicename
-		 * @return	boolean
-		 */
 		function in_category($nicename) {
+			/****************************************************************************************************
+			 * Checks if the post in the_loop belongs to the specified category nicename.
+			 * Different from in_category(), that checks for the id, not for the nicename.
+			 *
+			 * @param		container category nicename (slug)
+			 * @param		(optional) optional parent nicename
+			 * @return	boolean
+			 */
 			return wpp::is_term_child_of($nicename, get_the_category());
 		}
-
-		/****************************************************************************************************
-		 * Checks if a category is child of another. Counts also self as true.
-		 *
-		 * @param		child category
-		 * @param		parent category (or array)
-		 * @return	boolean true
-		 */
 		function is_term_child_of($child_term, $parent_term) {
+			/****************************************************************************************************
+			 * Checks if a category is child of another. Counts also self as true.
+			 *
+			 * @param		child category
+			 * @param		parent category (or array)
+			 * @return	boolean true
+			 */
 			if (is_array($parent_term)) {
 				$terms = $parent_term;
 			} else {
@@ -245,18 +243,18 @@ if (!isset($WPP_VERSION)) {
 	
 			return false;
 		}
-
-		/****************************************************************************************************
-		 * Get a specific custom item, optionally wrapped between two text strings.
-		 * Works inside The Loop only. To be used used outside specify the optional id parameter.
-		 *
-		 * @param			custom field
-		 * @param			before html
-		 * @param			after html
-		 * @param			optional id (to fetch the custom of a different post)
-		 * @return		html output
-		 */
+		
 		function get_post_custom($custom, $before = '', $after = '', $optid = 0) {
+			/****************************************************************************************************
+			 * Get a specific custom item, optionally wrapped between two text strings.
+			 * Works inside The Loop only. To be used used outside specify the optional id parameter.
+			 *
+			 * @param			custom field
+			 * @param			before html
+			 * @param			after html
+			 * @param			optional id (to fetch the custom of a different post)
+			 * @return		html output
+			 */
 			global $id;
 
 			$out = '';
@@ -270,15 +268,38 @@ if (!isset($WPP_VERSION)) {
 
 			return $out;
 		}
+		function get_attachments($name, $mime = null, $optid = 0) {
+			/****************************************************************************************************
+			 * Get the array of all the attachments, optionally filtered by name and mime type.
+			 * Works inside The Loop only. To be used used outside specify the optional id parameter.
+			 *
+			 * @param			attachment name
+			 * @param			mime type (optional)
+			 * @param			optional id (to fetch the custom of a different post)
+			 * @return		array
+			 */
+			/*global $id;
+			
+			$out = '';
+			if ($id && !$optid) $optid = $id;
 
-		/****************************************************************************************************
-		 * Returns the specified page, given a nicename.
-		 *
-		 * @param			page nicename
-		 * @param			(optional) message on non-existing page
-		 * @return		page content string
-		 */
+			$custom_fields = get_post_custom($optid);
+
+			if (isset($custom_fields[$custom])) {
+				$out = $before . $custom_fields[$custom][0] . $after;
+			}
+
+			return $out;*/
+		}
+		
 		function get_page_content($nicename, $on_empty = "The page '%s' is empty.") {
+			/****************************************************************************************************
+			 * Returns the specified page, given a nicename.
+			 *
+			 * @param			page nicename
+			 * @param			(optional) message on non-existing page
+			 * @return		page content string
+			 */
 		  $out = '';
 		
 		  $posts = wpp::get_posts(array('page' => $nicename));
@@ -290,17 +311,17 @@ if (!isset($WPP_VERSION)) {
 		  return $out;
 		}
 
-		/****************************************************************************************************
-		 * Return the type of the 'zone' where we are, the matching id reference and the associated terms
-		 * It's like an improved $wp_query->get_queried_object_id().
-		 *
-		 * - returned zones: page, post, author, search, category, date, tag, home
-		 * (matching is_page, is_single, is_author, is_search, is_category, is_date, is_tag, is_home)
-		 *
-		 * @param			(optional) array shortcut (i.e. wpp_get_zone('id'))
-		 * @return		array ['type' => '...', 'id' => 'n', 'terms' => array(...)]
-		 */
 		function get_zone($key = null, $taxonomy = 'category') {
+			/****************************************************************************************************
+			 * Return the type of the 'zone' where we are, the matching id reference and the associated terms
+			 * It's like an improved $wp_query->get_queried_object_id().
+			 *
+			 * - returned zones: page, post, author, search, category, date, tag, home
+			 * (matching is_page, is_single, is_author, is_search, is_category, is_date, is_tag, is_home)
+			 *
+			 * @param			(optional) array shortcut (i.e. wpp_get_zone('id'))
+			 * @return		array ['type' => '...', 'id' => 'n', 'terms' => array(...)]
+			 */
 			global $wp_query;
 			
 			$out = array(
@@ -376,14 +397,14 @@ if (!isset($WPP_VERSION)) {
 			if ($key === null) return $out;
 			return $out[$key];
 		}
-
-		/****************************************************************************************************
-		 * Checks if the specified user ID is an admin user
-		 *
-		 * @param		user id (0 for current logged user)
-		 * @return	boolean
-		 */
+		
 		function is_admin($uid = 0) {
+			/****************************************************************************************************
+			 * Checks if the specified user ID is an admin user
+			 *
+			 * @param		user id (0 for current logged user)
+			 * @return	boolean
+			 */
 		  global $wpdb, $current_user;
   
 		  $out = false;
@@ -417,14 +438,14 @@ if (!isset($WPP_VERSION)) {
 		  return $out;
 		}
 
-		/****************************************************************************************************
-		 * Get comments list array.
-		 *
-		 * @param		number of comments to retrieve
-		 * @param		optional post ID to relate comments
-		 * @return	array
-		 */
 		function get_last_comments($size = 10, $id = 0) {
+			/****************************************************************************************************
+			 * Get comments list array.
+			 *
+			 * @param		number of comments to retrieve
+			 * @param		optional post ID to relate comments
+			 * @return	array
+			 */
 			global $wpdb;
 			$out = array();
 	
@@ -462,15 +483,14 @@ if (!isset($WPP_VERSION)) {
 	
 			return $out;
 		}
-
-		/****************************************************************************************************
-		 * Get comments list array.
-		 * Requires MySQL 4.1+ (nested queries, but just two calls).
-		 *
-		 * @param		number of comments to retrieve
-		 * @return	array
-		 */
 		function get_last_comments_grouped($size = 10) {
+			/****************************************************************************************************
+			 * Get comments list array.
+			 * Requires MySQL 4.1+ (nested queries, but just two calls).
+			 *
+			 * @param		number of comments to retrieve
+			 * @return	array
+			 */
 			global $wpdb;
 			$out = array();
 	
@@ -529,14 +549,14 @@ if (!isset($WPP_VERSION)) {
 			return $out;
 		}
 		
-		/****************************************************************************************************
-		 * Returns the page at the top of the current pages subtree.
-		 * Copyright (C) 2007 + GNU/GPL2 by Roberto Ostinelli [http://www.ostinelli.net]
-		 * Modified by Davide 'Folletto' Casali.
-		 * 
-		 * @return	returns array('root', 'levels'), where root is a partial page object.
-		 */
 		function get_pages_root() {
+			/****************************************************************************************************
+			 * Returns the page at the top of the current pages subtree.
+			 * Copyright (C) 2007 + GNU/GPL2 by Roberto Ostinelli [http://www.ostinelli.net]
+			 * Modified by Davide 'Folletto' Casali.
+			 * 
+			 * @return	returns array('root', 'levels'), where root is a partial page object.
+			 */
 			global $wp_query, $wpdb, $post;
 			
 			$out = array(
@@ -575,21 +595,19 @@ if (!isset($WPP_VERSION)) {
 			// ****** Closing
 			return $out;
 		}
-		
-		/****************************************************************************************************
-		 * Echoes (HTML) the pages under the same parent page.
-		 * Copyright (C) 2007 + GNU/GPL2 by Roberto Ostinelli [http://www.ostinelli.net]
-		 * Modified by Davide 'Folletto' Casali.
-		 * 
-		 * @param		(optional) formatting arguments for wp_list_pages()
-		 * @param		(optional) boolean false to disable echo and trigger return data behaviour
-		 */
 		function list_pages_of_section($arguments = '&title_li=') {
+			/****************************************************************************************************
+			 * Echoes (HTML) the pages under the same parent page.
+			 * Copyright (C) 2007 + GNU/GPL2 by Roberto Ostinelli [http://www.ostinelli.net]
+			 * Modified by Davide 'Folletto' Casali.
+			 * 
+			 * @param		(optional) formatting arguments for wp_list_pages()
+			 * @param		(optional) boolean false to disable echo and trigger return data behaviour
+			 */
 			$root = wpp::get_pages_root();
 			return wp_list_pages($arguments . "&child_of=" . $root['page']->ID);
 		}
 		
-		// /\ END OF CLASS
 	}
 }
 
