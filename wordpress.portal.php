@@ -10,7 +10,7 @@ Author URI: http://digitalhymn.com/
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Last revision: 2008 05 15
+ * Last revision: 2009 01 18
  *
  * by Davide 'Folletto' Casali
  * www.digitalhymn.com
@@ -51,7 +51,7 @@ Author URI: http://digitalhymn.com/
  */
 
 if (!isset($WPP_VERSION)) {
-	$WPP_VERSION = 'WordPressPortal/0.7.1';
+	$WPP_VERSION = 'WordPressPortal/0.7.2';
 
 	class wpp {
 	
