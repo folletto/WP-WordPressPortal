@@ -149,6 +149,10 @@ if (!isset($WPP_VERSION)) {
           $filter['post_name'] = $filter['page'];
           unset($filter['page']); // kill shortcut
         }
+        
+        if (!isset($filter['post_type'])) {
+          $filter['post_type'] = 'post';
+        }
       }
       
       return wpp::foreach_anything($loopname, $filter, $limit);
