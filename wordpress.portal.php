@@ -4,7 +4,7 @@ Plugin Name: WordPress Portal
 Plugin URI: http://digitalhymn.com/argilla/wpp
 Description: This is a function library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
-Version: 0.7.2
+Version: 0.8
 Author URI: http://digitalhymn.com/
  ******************************************************************************************
  * WordPress Portal
@@ -23,13 +23,14 @@ Author URI: http://digitalhymn.com/
 
 /*
  * SUMMARY:
- *  wpp::foreach_post($filter, $limit): creates a "custom The Loop", with a filter match
+ *  wpp::foreach_post($filter, $limit): creates a custom TheLoop, with a filter match
  *  wpp::get_posts($filter, $limit): gets all the posts matching a filter
+ *  wpp::foreach_attachment(): creates a custom TheLoop for the attachments, can be used inside TheLoop
+ *  wpp::get_attachments($filter, $limit): gets all the posts matching a filter
+ *  wpp::get_post_custom($custom, $before, $after, $optid): [TheLoop] gets the specified custom
  *  wpp::uri_category($field, $default): gets the category of the loaded page
  *  wpp::in_category($nicename): [TheLoop] checks if the posts belongs to that category
  *  wpp::is_term_child_of($child, $parent): checks if the category is child of another (nicename)
- *  wpp::get_post_custom($custom, $before, $after, $optid): [TheLoop] gets the specified custom
- *  wpp::get_attachment(): [TheLoop] gets the specified attachment
  *  wpp::get_page_content($nicename, $on_empty): gets the specified page content
  *  wpp::get_zone(): gets an array containing ['type' => '...', 'id' => 'n', 'terms' => array(...)]
  *  wpp::is_admin($userid): check if the current logged user is an "administrator"
@@ -41,7 +42,7 @@ Author URI: http://digitalhymn.com/
  * DETAILS:
  * The most interesting function is the wpp_foreach_post() that in fact creates a custom
  * "The Loop", using the syntax:
- *          while($post = wpp::foreach_post($filter, $limit)) { ... }
+ *          while(wpp::foreach_post(array(...), 10)) { ... }
  * 
  * The function wpp::get_zone() retrieves the correct term from the page currently loaded.
  * For every loaded page it tries to match a tag (from the 'category' taxonomy).
@@ -52,100 +53,105 @@ Author URI: http://digitalhymn.com/
  */
 
 if (!isset($WPP_VERSION)) {
-	$WPP_VERSION = 'WordPressPortal/0.7.2';
-
-	class wpp {
+	$WPP_VERSION = 'WordPressPortal/0.8';
 	
-		function foreach_post($filter, $limit = null) {
+	class wpp {
+		
+		static $loops = array();
+		static $loops_backups = array();
+		
+		function foreach_anything($loopname, $filter = array(), $limit = -1) {
 			/****************************************************************************************************
-			 * Creates a custom The Loop (i.e. like: while (have_posts()) : the_post(); [...] endwhile;).
+			 * Internal function.
+			 * Please use the specific functions: foreach_post, foreach_attachment.
+			 * Creates a custom The Loop to access anything: posts, pages, revisions, attachments.
+			 * Syntax:
+			 *   while(wpp::foreach_anything('posts', array(...), 10) { ... }
 			 * 
-			 * The filter parameter in array mode filters additional special queries:
-			 *   'category' => 'name', selects all the posts from a specific category using its nicename (slug)
-			 *   'page' => 'name', retrieves the page defined by its nicename (slug)
-			 *
-			 * @param			filter string (SQL WHERE) or array (converted to SQL WHERE, AND of equals (==))
-			 * @param			limit string (i.e. 1 or 1,10)
-			 * @return		single post array
+			 * @param 		loop name
+			 * @param			query parameteres array
+			 * @return		item or false
 			 */
-			global $wpdb;
-			// Working variables for The WPP Loop
-			global $__wpp_posts;
-			// Backups
-			global $__wpp_old_posts; // backup: possible existing $post
-			global $__wpp_old_previousday; // backup: possible existing $previousday
-			// TheLoop emulation variables
-			global $post, $previousday;
-		
-			// ****** Init
-			$out = null;
-			$where = array();
-		
-			if (!isset($__wpp_posts) || $__wpp_posts === null) {
+			global $wp_query;
+			// TheLoop variables
+			global $post;
+			global $previousday;
+			
+			$out = false;
+			
+			if (wpp::is_foreach_init_season($loopname)) {
 				// *** Backup
-				$__wpp_old_posts = $post;
-				$__wpp_old_previousday = $previousday;
-			
-				// ****** Building SQL where clause. 
-				if (is_array($filter)) {
-					foreach ($filter as $key => $value) {
-						if ($key == 'category') {
-							// *** Special: category by nicename
-							$catwhere = array("tr.term_taxonomy_id = '0'");
-							$terms = wpp::get_terms_recursive($value);
-							foreach ($terms as $term) {
-								$catwhere[] = "tr.term_taxonomy_id = '" . $term->term_taxonomy_id . "'";
-							}
-							$where[] = '(' . join(' OR ', $catwhere) . ')';
-						} else if ($key == 'page') {
-							// *** Special: page by nicename
-							$where[] = "post_name = '" . $value . "'";
-						} else {
-							// ***  Normal where condition
-							$where[] = "" . $key . " = '" . $value . "'";
-						}
-					}
-					$where = join(' AND ', $where);
-				} else {
-					$where = $filter;
-					$filter = array();
-				}
-		
-				// ****** Querying
-				$query = "
-					SELECT DISTINCT p.*
-					FROM " . $wpdb->posts . " As p
-					INNER JOIN " . $wpdb->term_relationships . " As tr ON tr.object_id = p.ID
-					WHERE
-						post_status = 'publish' AND 
-						post_type = '" . (isset($filter['page']) ? "page" : "post") . "'
-						" . ($where ? "AND " . $where : '') . "
-					ORDER BY post_date DESC
-						" . ($limit ? 'LIMIT ' . $limit : '') . "
-				";
-			
-				$__wpp_posts = $wpdb->get_results($query);
+				wpp::$loops_backups[$loopname] = array('post' => $post, 'previousday' => $previousday);
+				
+				// *** Filter
+				if ($limit > 0) $filter['posts_per_page'] = $limit;
+				
+				// *** Make sure minimum defaults are used
+				$defaults = array(
+					'post_type' => 'any', // any | attachment | post | page
+					'post_status' => 'published', // any | published | draft
+					'post_parent' => 0,
+				);
+				
+				// *** Query
+				$args = wp_parse_args($filter, $defaults);
+				wpp::$loops[$loopname] = new WP_Query($args);
 			}
-		
+			
 			// ****** Elaborate the custom The WPP Loop
-			if (is_array($__wpp_posts) && sizeof($__wpp_posts) > 0) {
+			if (wpp::$loops[$loopname]->have_posts()) {
 				// *** Next
-				$post = array_shift($__wpp_posts);
-				setup_postdata($post); // WP hook
-		
+				wpp::$loops[$loopname]->the_post();
 				$out = $post;
 			} else {
 				// *** Reset
-				$post = null;
-				$__wpp_posts = null;
+				unset(wpp::$loops[$loopname]); // kill custom loop
+				$out = $post = null;
 		
 				// *** Restore backup
-				$post = $__wpp_old_posts;
+				$post = wpp::$loops_backups[$loopname]['post'];
 				setup_postdata($post); // WP hook
-				$previousday = $__wpp_old_previousday;
+				$previousday = wpp::$loops_backups[$loopname]['previousday'];
 			}
 
 			return $out;
+		}
+		function is_foreach_init_season($loopname) {
+			/****************************************************************************************************
+			 * Internal function.
+			 * Checks if the named loop is already present (and so, able to loop).
+			 * 
+			 * @param 		internal loop name
+			 * @return		boolean
+			 */
+			return (!isset(wpp::$loops[$loopname]) || wpp::$loops[$loopname] === null);
+		}
+		
+		function foreach_post($filter = array(), $limit = null) {
+			/****************************************************************************************************
+			 * Creates a custom The Loop (i.e. like: while (have_posts()) : the_post(); [...] endwhile;).
+			 * Syntax:
+			 *   while(wpp::foreach_post(array(...), 10)) { ... }
+			 * 
+			 * @param 		query parameteres array
+			 * @param			limit number of items
+			 * @return		item or false
+			 */
+			$loopname = 'posts';
+			if (wpp::is_foreach_init_season($loopname)) {
+				if (!is_array($filter)) $filter = array();
+				
+				if (isset($filter['category'])) {
+					$filter['category_name'] = $filter['category'];
+					unset($filter['category']); // kill shortcut
+				}
+				if (isset($filter['page'])) {
+					$filter['post_name'] = $filter['page'];
+					unset($filter['page']); // kill shortcut
+				}
+			}
+			
+			return wpp::foreach_anything($loopname, $filter, $limit);
 		}
 		function get_posts($filter, $limit = null) {
 			/****************************************************************************************************
@@ -162,6 +168,79 @@ if (!isset($WPP_VERSION)) {
 			}
 
 			return $posts;
+		}
+		
+		function foreach_attachment($filter = array(), $limit = -1) {
+			/****************************************************************************************************
+			 * Creates a custom The Loop to list attachments of the current post (or the passed one)
+			 * Syntax:
+			 *   while(wpp::foreach_attachment(array(...), 10)) { ... }
+			 * 
+			 * @param 		query parameteres array
+			 * @param			limit number of items
+			 * @return		item or false
+			 */
+			global $post;
+			
+			$loopname = 'attachments';
+			if (wpp::is_foreach_init_season($loopname)) {
+				if (!is_array($filter)) $filter = array();
+				
+				if (!isset($filter['post_parent'])) $filter['post_parent'] = $post->ID;
+				
+				if (isset($filter['name'])) {
+					$filter['s'] = $filter['name'];
+					unset($filter['name']); // kill shortcut
+				}
+				if (isset($filter['s'])) $filter['exact'] = true;
+				
+				$filter['post_type'] = 'attachment';
+				$filter['post_status'] = 'any';
+				$filter['orderby'] = "menu_order ASC, title DESC";
+			}
+			
+			return wpp::foreach_anything($loopname, $filter, $limit);
+		}
+		function get_attachments($filter = array(), $limit = -1) {
+			/****************************************************************************************************
+			 * Gets all the posts into an array. Wraps wpp_foreach_post().
+			 *
+			 * @param			filter string (SQL WHERE) or array (converted to SQL WHERE, AND of equals (==))
+			 * @param			limit string (i.e. 1 or 1,10)
+			 * @return		posts array
+			 */
+			$posts = array();
+
+			while ($post = wpp::foreach_attachment($filter, $limit)) {
+				$posts[] = $post;
+			}
+
+			return $posts;
+		}
+		
+		function get_post_custom($custom, $before = '', $after = '', $optid = 0) {
+			/****************************************************************************************************
+			 * Get a specific custom item, optionally wrapped between two text strings.
+			 * Works inside The Loop only. To be used used outside specify the optional id parameter.
+			 *
+			 * @param			custom field
+			 * @param			before html
+			 * @param			after html
+			 * @param			optional id (to fetch the custom of a different post)
+			 * @return		html output
+			 */
+			global $id;
+
+			$out = '';
+			if ($id && !$optid) $optid = $id;
+
+			$custom_fields = get_post_custom($optid);
+
+			if (isset($custom_fields[$custom])) {
+				$out = $before . $custom_fields[$custom][0] . $after;
+			}
+
+			return $out;
 		}
 		
 		function get_terms_recursive($ref, $levels = -1, $taxonomy = 'category') {
@@ -242,54 +321,6 @@ if (!isset($WPP_VERSION)) {
 			}
 	
 			return false;
-		}
-		
-		function get_post_custom($custom, $before = '', $after = '', $optid = 0) {
-			/****************************************************************************************************
-			 * Get a specific custom item, optionally wrapped between two text strings.
-			 * Works inside The Loop only. To be used used outside specify the optional id parameter.
-			 *
-			 * @param			custom field
-			 * @param			before html
-			 * @param			after html
-			 * @param			optional id (to fetch the custom of a different post)
-			 * @return		html output
-			 */
-			global $id;
-
-			$out = '';
-			if ($id && !$optid) $optid = $id;
-
-			$custom_fields = get_post_custom($optid);
-
-			if (isset($custom_fields[$custom])) {
-				$out = $before . $custom_fields[$custom][0] . $after;
-			}
-
-			return $out;
-		}
-		function get_attachments($name, $mime = null, $optid = 0) {
-			/****************************************************************************************************
-			 * Get the array of all the attachments, optionally filtered by name and mime type.
-			 * Works inside The Loop only. To be used used outside specify the optional id parameter.
-			 *
-			 * @param			attachment name
-			 * @param			mime type (optional)
-			 * @param			optional id (to fetch the custom of a different post)
-			 * @return		array
-			 */
-			/*global $id;
-			
-			$out = '';
-			if ($id && !$optid) $optid = $id;
-
-			$custom_fields = get_post_custom($optid);
-
-			if (isset($custom_fields[$custom])) {
-				$out = $before . $custom_fields[$custom][0] . $after;
-			}
-
-			return $out;*/
 		}
 		
 		function get_page_content($nicename, $on_empty = "The page '%s' is empty.") {
