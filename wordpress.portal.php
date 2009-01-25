@@ -14,7 +14,7 @@ Author URI: http://digitalhymn.com/
  *
  * by Davide 'Folletto' Casali <folletto AT gmail DOT com>
  * www.digitalhymn.com
- * Copyright (C) 2006/2007 - Creative Commons (CC) by-sa 2.5
+ * Copyright (C) 2006/2009 - Creative Commons (CC) by-sa 2.5
  * 
  * Based upon a library developed for key-one.it (Kallideas / Key-One)
  * Thanks to Roberto Ostinelli and Alessandro Morandi.
@@ -38,6 +38,7 @@ Author URI: http://digitalhymn.com/
  *  wpp::get_last_comments_grouped($size): gets the last comments, one comment per post
  *  wpp::get_pages_root(): gets the root page of the current page subtree
  *  wpp::list_pages_of_section(): like wp_list_pages() but getting only the pages of the section
+ *  wpp::add_virtual_page($url, $handlersarray): add a custom virtual page to be called when $url is called
  * 
  * DETAILS:
  * The most interesting function is the wpp_foreach_post() that in fact creates a custom
