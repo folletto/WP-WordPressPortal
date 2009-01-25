@@ -4,13 +4,13 @@ Plugin Name: WordPress Portal
 Plugin URI: http://digitalhymn.com/argilla/wpp
 Description: This is a function library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
-Version: 0.8
+Version: 0.8.1
 Author URI: http://digitalhymn.com/
  ******************************************************************************************
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Last revision: 2009 01 18
+ * Last revision: 2009 01 25
  *
  * by Davide 'Folletto' Casali <folletto AT gmail DOT com>
  * www.digitalhymn.com
@@ -52,13 +52,14 @@ Author URI: http://digitalhymn.com/
  * 
  */
 
-if (!isset($WPP_VERSION)) {
-  $WPP_VERSION = 'WordPressPortal/0.8';
+if (!isset($WPP_VERSION) && !class_exists("wpp")) {
+  $WPP_VERSION = 'WordPressPortal/0.8.1';
   
   class wpp {
     
     static $loops = array();
     static $loops_backups = array();
+    static $virtual_page = array();
     
     function foreach_anything($loopname, $filter = array(), $limit = -1) {
       /****************************************************************************************************
@@ -643,6 +644,45 @@ if (!isset($WPP_VERSION)) {
       return wp_list_pages($arguments . "&child_of=" . $root['page']->ID);
     }
     
+    function add_virtual_page($url, $handlers = array()) {
+      /****************************************************************************************************
+       * Dynamically inject URL handlers inside WP structure.
+       * 
+       * @param    virtual URL to be handled (i.e. 'path/to/handle')
+       * @param    php pages to be called (i.e. array(get_template_directory() . "/virtual.php", dirname(__FILE__) . "/virtual.php"));
+       */
+      if (is_array($handlers) && sizeof($handlers)) {
+        // ****** Prepare data
+        $url = rtrim($url, "/");
+        wpp::$virtual_page[$url] = array(
+          'handlers' => $handlers,
+        );
+        
+  			// ****** SmartAss Rewrite
+  			$url_wanted = rtrim(dirname($_SERVER['PHP_SELF']), "/") . "/" . $url;
+  			$url_requested = substr(trim($_SERVER['REQUEST_URI']), 0, strlen($url_wanted));
+  			if ($url_wanted == $url_requested) {
+  				// ****** Add Filter
+  				$pages = "";
+  				$fx = create_function('$handler', '
+  				  $out = $handler;
+  				  
+        		foreach (array("' . join($handlers, '", "') . '") as $custom_template) {
+        			if (file_exists($custom_template)) {
+        				$out = $custom_template;
+        				break;
+        			}
+        		}
+
+        		return $out;
+  				');
+  				add_filter('404_template', $fx);
+          
+  				// ****** Service Operations
+  				wpp::$virtual_page[$url]['purl'] = explode("/", substr(trim($_SERVER['REQUEST_URI']), strlen($url_wanted) + 1));
+  			}
+      }
+    }
   }
 }
 
