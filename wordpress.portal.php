@@ -4,7 +4,7 @@ Plugin Name: WordPress Portal
 Plugin URI: http://digitalhymn.com/argilla/wpp
 Description: This is a function library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
-Version: 0.8.1
+Version: 0.9.0
 Author URI: http://digitalhymn.com/
  ******************************************************************************************
  * WordPress Portal
@@ -54,7 +54,7 @@ Author URI: http://digitalhymn.com/
  */
 
 if (!isset($WPP_VERSION) && !class_exists("wpp")) {
-  $WPP_VERSION = 'WordPressPortal/0.8.1';
+  $WPP_VERSION = 'WordPressPortal/0.9.0';
   
   class wpp {
     
@@ -686,5 +686,117 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
     }
   }
 }
+
+
+// \/ WIDGET ZONE
+function wordpressportal_widget($args) {
+  /****************************************************************************************************
+   * Display WPP foreach widget.
+   */
+  // ****** Unwrap parameters
+	extract($args);
+	$options = get_option('wppwidget');
+  
+	$title = empty($options['title']) ? __('News') : apply_filters('widget_title', $options['title']);
+	$category = empty($options['category']) ? '' : $options['category'];
+	$count = empty($options['count']) ? '3' : $options['count'];
+	$more = $options['more'] > 0 ? true : false;
+  
+  // ****** Write output
+	//$out = wp_list_pages( array('title_li' => '', 'echo' => 0, 'sort_column' => $sortby, 'exclude' => $exclude) );
+	
+	while (wpp::foreach_post(array('cat' => $category), $more)) {
+	  $out .= '<li>
+	  <a href="' . get_permalink() . '">' . get_the_title() . '</a>
+	  <div class="">' . get_the_excerpt() . '</div>
+	  </li>';
+	}
+	if ($more) $out .= '<small class="wpwidget-more"><a href="' . '?cat=' . $category . '">' . __("Read more...") . '</a></small>';
+  
+  // \/ WIDGET CODE
+	if (!empty($out)) {
+?>
+	<?php echo $before_widget; ?>
+		<?php echo $before_title . $title . $after_title; ?>
+		<ul>
+			<?php echo $out; ?>
+		</ul>
+	<?php echo $after_widget; ?>
+<?php
+	}
+	// /\ WIDGET CODE
+}
+function wordpressportal_widget_control() {
+  /****************************************************************************************************
+   * Configure WPP foreach widget.
+   */
+	$options = $newoptions = get_option('wppwidget');
+	
+	// ****** Handle submit
+	if (isset($_POST['wppwidget-submit'])) {
+		$newoptions['title'] = strip_tags(stripslashes($_POST['wppwidget-title']));
+		$newoptions['category'] = stripslashes($_POST['wppwidget-category']);
+		$newoptions['count'] = intval(stripslashes($_POST['wppwidget-count']));
+		$newoptions['more'] = isset($_POST['wppwidget-more']);
+	}
+	if ($options != $newoptions) {
+		$options = $newoptions;
+		update_option('wppwidget', $options);
+	}
+	
+	$title = attribute_escape($options['title']);
+	$category = attribute_escape($options['category']);
+	$count = intval(attribute_escape($options['count']));
+	$more = (bool)intval($options['more']);
+?>
+		<p>
+		  <label for="wppwidget-title"><?php _e('Title:'); ?>
+		    <input class="widefat" id="wppwidget-title" name="wppwidget-title" type="text" value="<?php echo $title; ?>" />
+		  </label>
+		</p>
+		<p>
+			<label for="wppwidget-category"><?php _e( 'Category:' ); ?><br/>
+			  <?php
+			  wp_dropdown_categories(array(
+			    'name' => "wppwidget-category",
+			    'hierarchical' => true,
+			    'hide_empty' => false,
+			    'selected' => $category,
+			    
+			    /*'show_option_all' => '', 'show_option_none' => '', 'orderby' => 'ID', 
+          'order' => 'ASC', 'show_last_update' => 0, 'show_count' => 0, 'hide_empty' => 1, 
+          'child_of' => 0, 'exclude' => '', 'echo' => 1, 'selected' => 0, 'hierarchical' => 0, 
+          'name' => 'cat', 'class' => 'postform', 'depth' => 0*/
+			  ));
+			  ?>
+			</label>
+		</p>
+		<p>
+			<label for="wppwidget-count">
+		    <input style="width: 25px; text-align: center;" id="wppwidget-count" name="wppwidget-count" type="text" value="<?php echo $count; ?>" />
+		    <?php _e('post(s) displayed'); ?>
+		  </label>
+		</p>
+		<p>
+		  <label for="wppwidget-more">
+				<input type="checkbox" class="checkbox" id="wppwidget-more" name="wppwidget-more"<?php checked($more, true); ?> />
+				<?php _e('Show "more" button'); ?>
+			</label>
+		</p>
+		<input type="hidden" id="wppwidget-submit" name="wppwidget-submit" value="1" />
+<?php
+}
+
+function wordpressportal_widgets_init() {
+  $name = "WordPress Portal";
+  wp_register_widget_control(sanitize_title($name), $name, 'wordpressportal_widget_control', array(
+    //'base_id' => '',
+  ));
+  wp_register_sidebar_widget(sanitize_title($name), $name, 'wordpressportal_widget', array(
+    'classname' => 'wppwidget',
+    'description' => __( "Show any content from the specified category."),
+  ));
+}
+add_action('init', 'wordpressportal_widgets_init');
 
 ?>
