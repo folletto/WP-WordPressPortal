@@ -689,22 +689,23 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
 
 
 // \/ WIDGET ZONE
-function wordpressportal_widget($args) {
+function wppwidget($args, $key) {
   /****************************************************************************************************
    * Display WPP foreach widget.
    */
   // ****** Unwrap parameters
 	extract($args);
 	$options = get_option('wppwidget');
+	if ($key > -1) $options = $options[$key['number']];
+	//echo str_replace("\n", "<br/>", str_replace(" ", "&nbsp;&nbsp;", print_r($options[$key['number']], true)));
   
+  // ****** Prepare data
 	$title = empty($options['title']) ? __('News') : apply_filters('widget_title', $options['title']);
 	$category = empty($options['category']) ? '' : $options['category'];
 	$count = empty($options['count']) ? '3' : $options['count'];
 	$more = $options['more'] > 0 ? true : false;
   
   // ****** Write output
-	//$out = wp_list_pages( array('title_li' => '', 'echo' => 0, 'sort_column' => $sortby, 'exclude' => $exclude) );
-	
 	while (wpp::foreach_post(array('cat' => $category), $more)) {
 	  $out .= '<li>
 	  <a href="' . get_permalink() . '">' . get_the_title() . '</a>
@@ -713,7 +714,7 @@ function wordpressportal_widget($args) {
 	}
 	if ($more) $out .= '<small class="wpwidget-more"><a href="' . '?cat=' . $category . '">' . __("Read more...") . '</a></small>';
   
-  // \/ WIDGET CODE
+  // \/ WIDGET CODE --------------------------------------------------\/
 	if (!empty($out)) {
 ?>
 	<?php echo $before_widget; ?>
@@ -724,41 +725,48 @@ function wordpressportal_widget($args) {
 	<?php echo $after_widget; ?>
 <?php
 	}
-	// /\ WIDGET CODE
+	// /\ WIDGET CODE --------------------------------------------------/\
 }
-function wordpressportal_widget_control() {
+function wppwidget_control($args) {
   /****************************************************************************************************
    * Configure WPP foreach widget.
    */
-	$options = $newoptions = get_option('wppwidget');
+  $class = 'wppwidget';
+  $key = ($args['number'] == -1) ? '%i%' : $args['number']; // -1 = no widget activated, %i% wildcard
+  $formclasskey = $class . '[' . $key . ']';
+	$options = $newoptions = get_option($class);
 	
 	// ****** Handle submit
-	if (isset($_POST['wppwidget-submit'])) {
-		$newoptions['title'] = strip_tags(stripslashes($_POST['wppwidget-title']));
-		$newoptions['category'] = stripslashes($_POST['wppwidget-category']);
-		$newoptions['count'] = intval(stripslashes($_POST['wppwidget-count']));
-		$newoptions['more'] = isset($_POST['wppwidget-more']);
+	if (isset($_POST[$class])) {
+	  foreach ($_POST[$class] as $key => $formoptions) {
+  		$newoptions[$key]['title'] = strip_tags(stripslashes($_POST[$class][$key]['title']));
+  		$newoptions[$key]['category'] = stripslashes($_POST[$class][$key]['category']);
+  		$newoptions[$key]['count'] = intval(stripslashes($_POST[$class][$key]['count']));
+  		$newoptions[$key]['more'] = isset($_POST[$class][$key]['more']);
+	  }
 	}
 	if ($options != $newoptions) {
+	  // TODO: MUST add cleanup code for removed widgets (hopefully in future added by WP team)
 		$options = $newoptions;
-		update_option('wppwidget', $options);
+		update_option($class, $options);
 	}
 	
-	$title = attribute_escape($options['title']);
-	$category = attribute_escape($options['category']);
-	$count = intval(attribute_escape($options['count']));
-	$more = (bool)intval($options['more']);
+	// ****** Prepare current content for form output
+	$title = @attribute_escape($options[$key]['title']);
+	$category = @attribute_escape($options[$key]['category']);
+	$count = @intval(attribute_escape($options[$key]['count']));
+	$more = @(bool)intval($options[$key]['more']);
 ?>
 		<p>
-		  <label for="wppwidget-title"><?php _e('Title:'); ?>
-		    <input class="widefat" id="wppwidget-title" name="wppwidget-title" type="text" value="<?php echo $title; ?>" />
+		  <label for="<? echo $formclasskey; ?>[title]"><?php _e('Title:'); ?>
+		    <input class="widefat" id="<? echo $formclasskey; ?>[title]" name="<? echo $formclasskey; ?>[title]" type="text" value="<?php echo $title; ?>" />
 		  </label>
 		</p>
 		<p>
-			<label for="wppwidget-category"><?php _e( 'Category:' ); ?><br/>
+			<label for="<? echo $formclasskey; ?>[category]"><?php _e( 'Category:' ); ?><br/>
 			  <?php
 			  wp_dropdown_categories(array(
-			    'name' => "wppwidget-category",
+			    'name' => $formclasskey . '[category]',
 			    'hierarchical' => true,
 			    'hide_empty' => false,
 			    'selected' => $category,
@@ -772,31 +780,54 @@ function wordpressportal_widget_control() {
 			</label>
 		</p>
 		<p>
-			<label for="wppwidget-count">
-		    <input style="width: 25px; text-align: center;" id="wppwidget-count" name="wppwidget-count" type="text" value="<?php echo $count; ?>" />
+			<label for="<? echo $formclasskey; ?>[count]">
+		    <input style="width: 25px; text-align: center;" id="<? echo $formclasskey; ?>[count]" name="<? echo $formclasskey; ?>[count]" type="text" value="<?php echo $count; ?>" />
 		    <?php _e('post(s) displayed'); ?>
 		  </label>
 		</p>
 		<p>
-		  <label for="wppwidget-more">
-				<input type="checkbox" class="checkbox" id="wppwidget-more" name="wppwidget-more"<?php checked($more, true); ?> />
+		  <label for="<? echo $formclasskey; ?>[more]">
+				<input type="checkbox" class="checkbox" id="<? echo $formclasskey; ?>[more]" name="<? echo $formclasskey; ?>[more]"<?php checked($more, true); ?> />
 				<?php _e('Show "more" button'); ?>
 			</label>
 		</p>
-		<input type="hidden" id="wppwidget-submit" name="wppwidget-submit" value="1" />
+		<input type="hidden" id="<? echo $formclasskey; ?>[submit]" name="<? echo $formclasskey; ?>[submit]" value="1" />
 <?php
 }
 
-function wordpressportal_widgets_init() {
-  $name = "WordPress Portal";
-  wp_register_widget_control(sanitize_title($name), $name, 'wordpressportal_widget_control', array(
-    //'base_id' => '',
-  ));
-  wp_register_sidebar_widget(sanitize_title($name), $name, 'wordpressportal_widget', array(
-    'classname' => 'wppwidget',
-    'description' => __( "Show any content from the specified category."),
-  ));
+add_action('init', 'wordpressportal_multiregister');
+function wordpressportal_multiregister() {
+  /****************************************************************************************************
+   * Register multiple widgets.
+   *
+   * You only need to configure the few parameters below.
+   */
+  $name = 'WordPress Portal';
+  $description = 'Show any content from the specified category.';
+  $class = 'wppwidget'; // class id, widget fx and with "_control" appended as widget Admin fx.
+  
+  // ****** Init
+	$prefix = sanitize_title($name); // $id prefix
+	$widget_ops = array(
+	  'classname' => $class,
+	  'description' => __($description),
+	);
+	$control_ops = array(
+	  //'width' => 200,
+	  //'height' => 200,
+	  'id_base' => $prefix,
+	);
+	
+	// ****** Get Options
+	$options = get_option($class);
+	//if (isset($options[0])) unset($options[0]); // uh? why?
+	if (empty($options)) $options = array(array()); // Not initialized yet, create empty default.
+	
+	// ****** Initialize widgets
+	foreach($options as $key => $content) {
+		wp_register_sidebar_widget($prefix . '-' . $key, __($name), $class, $widget_ops, array('number' => $key));
+		wp_register_widget_control($prefix . '-' . $key, __($name), $class . '_control', $control_ops, array('number' => $key));
+	}
 }
-add_action('init', 'wordpressportal_widgets_init');
 
 ?>
