@@ -685,149 +685,151 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
       }
     }
   }
+  
+  
+  
+  // \/ WIDGET ZONE
+  function wppwidget($args, $key) {
+    /****************************************************************************************************
+     * Display WPP foreach widget.
+     */
+    // ****** Unwrap parameters
+  	extract($args);
+  	$options = get_option('wppwidget');
+  	if ($key > -1) $options = $options[$key['number']];
+  	//echo str_replace("\n", "<br/>", str_replace(" ", "&nbsp;&nbsp;", print_r($options[$key['number']], true)));
+
+    // ****** Prepare data
+  	$title = empty($options['title']) ? __('News') : apply_filters('widget_title', $options['title']);
+  	$category = empty($options['category']) ? '' : $options['category'];
+  	$count = empty($options['count']) ? '3' : $options['count'];
+  	$more = $options['more'] > 0 ? true : false;
+
+    // ****** Write output
+  	while (wpp::foreach_post(array('cat' => $category), $more)) {
+  	  $out .= '<li>
+  	  <a href="' . get_permalink() . '">' . get_the_title() . '</a>
+  	  <div class="">' . get_the_excerpt() . '</div>
+  	  </li>';
+  	}
+  	if ($more) $out .= '<small class="wpwidget-more"><a href="' . '?cat=' . $category . '">' . __("Read more...") . '</a></small>';
+
+    // \/ WIDGET CODE --------------------------------------------------\/
+  	if (!empty($out)) {
+  ?>
+  	<?php echo $before_widget; ?>
+  		<?php echo $before_title . $title . $after_title; ?>
+  		<ul>
+  			<?php echo $out; ?>
+  		</ul>
+  	<?php echo $after_widget; ?>
+  <?php
+  	}
+  	// /\ WIDGET CODE --------------------------------------------------/\
+  }
+  function wppwidget_control($args) {
+    /****************************************************************************************************
+     * Configure WPP foreach widget.
+     */
+    $class = 'wppwidget';
+    $key = ($args['number'] == -1) ? '%i%' : $args['number']; // -1 = no widget activated, %i% wildcard
+    $formclasskey = $class . '[' . $key . ']';
+  	$options = $newoptions = get_option($class);
+
+  	// ****** Handle submit
+  	if (isset($_POST[$class])) {
+  	  foreach ($_POST[$class] as $key => $formoptions) {
+    		$newoptions[$key]['title'] = strip_tags(stripslashes($_POST[$class][$key]['title']));
+    		$newoptions[$key]['category'] = stripslashes($_POST[$class][$key]['category']);
+    		$newoptions[$key]['count'] = intval(stripslashes($_POST[$class][$key]['count']));
+    		$newoptions[$key]['more'] = isset($_POST[$class][$key]['more']);
+  	  }
+  	}
+  	if ($options != $newoptions) {
+  	  // TODO: MUST add cleanup code for removed widgets (hopefully in future added by WP team)
+  		$options = $newoptions;
+  		update_option($class, $options);
+  	}
+
+  	// ****** Prepare current content for form output
+  	$title = @attribute_escape($options[$key]['title']);
+  	$category = @attribute_escape($options[$key]['category']);
+  	$count = @intval(attribute_escape($options[$key]['count']));
+  	$more = @(bool)intval($options[$key]['more']);
+  ?>
+  		<p>
+  		  <label for="<? echo $formclasskey; ?>[title]"><?php _e('Title:'); ?>
+  		    <input class="widefat" id="<? echo $formclasskey; ?>[title]" name="<? echo $formclasskey; ?>[title]" type="text" value="<?php echo $title; ?>" />
+  		  </label>
+  		</p>
+  		<p>
+  			<label for="<? echo $formclasskey; ?>[category]"><?php _e( 'Category:' ); ?><br/>
+  			  <?php
+  			  wp_dropdown_categories(array(
+  			    'name' => $formclasskey . '[category]',
+  			    'hierarchical' => true,
+  			    'hide_empty' => false,
+  			    'selected' => $category,
+
+  			    /*'show_option_all' => '', 'show_option_none' => '', 'orderby' => 'ID', 
+            'order' => 'ASC', 'show_last_update' => 0, 'show_count' => 0, 'hide_empty' => 1, 
+            'child_of' => 0, 'exclude' => '', 'echo' => 1, 'selected' => 0, 'hierarchical' => 0, 
+            'name' => 'cat', 'class' => 'postform', 'depth' => 0*/
+  			  ));
+  			  ?>
+  			</label>
+  		</p>
+  		<p>
+  			<label for="<? echo $formclasskey; ?>[count]">
+  		    <input style="width: 25px; text-align: center;" id="<? echo $formclasskey; ?>[count]" name="<? echo $formclasskey; ?>[count]" type="text" value="<?php echo $count; ?>" />
+  		    <?php _e('post(s) displayed'); ?>
+  		  </label>
+  		</p>
+  		<p>
+  		  <label for="<? echo $formclasskey; ?>[more]">
+  				<input type="checkbox" class="checkbox" id="<? echo $formclasskey; ?>[more]" name="<? echo $formclasskey; ?>[more]"<?php checked($more, true); ?> />
+  				<?php _e('Show "more" button'); ?>
+  			</label>
+  		</p>
+  		<input type="hidden" id="<? echo $formclasskey; ?>[submit]" name="<? echo $formclasskey; ?>[submit]" value="1" />
+  <?php
+  }
+
+  add_action('init', 'wordpressportal_multiregister');
+  function wordpressportal_multiregister() {
+    /****************************************************************************************************
+     * Register multiple widgets.
+     *
+     * You only need to configure the few parameters below.
+     */
+    $name = 'WordPress Portal';
+    $description = 'Show any content from the specified category.';
+    $class = 'wppwidget'; // class id, widget fx and with "_control" appended as widget Admin fx.
+
+    // ****** Init
+  	$prefix = sanitize_title($name); // $id prefix
+  	$widget_ops = array(
+  	  'classname' => $class,
+  	  'description' => __($description),
+  	);
+  	$control_ops = array(
+  	  //'width' => 200,
+  	  //'height' => 200,
+  	  'id_base' => $prefix,
+  	);
+
+  	// ****** Get Options
+  	$options = get_option($class);
+  	//if (isset($options[0])) unset($options[0]); // uh? why?
+  	if (empty($options)) $options = array(array()); // Not initialized yet, create empty default.
+
+  	// ****** Initialize widgets
+  	foreach($options as $key => $content) {
+  		wp_register_sidebar_widget($prefix . '-' . $key, __($name), $class, $widget_ops, array('number' => $key));
+  		wp_register_widget_control($prefix . '-' . $key, __($name), $class . '_control', $control_ops, array('number' => $key));
+  	}
+  }
 }
 
-
-// \/ WIDGET ZONE
-function wppwidget($args, $key) {
-  /****************************************************************************************************
-   * Display WPP foreach widget.
-   */
-  // ****** Unwrap parameters
-	extract($args);
-	$options = get_option('wppwidget');
-	if ($key > -1) $options = $options[$key['number']];
-	//echo str_replace("\n", "<br/>", str_replace(" ", "&nbsp;&nbsp;", print_r($options[$key['number']], true)));
-  
-  // ****** Prepare data
-	$title = empty($options['title']) ? __('News') : apply_filters('widget_title', $options['title']);
-	$category = empty($options['category']) ? '' : $options['category'];
-	$count = empty($options['count']) ? '3' : $options['count'];
-	$more = $options['more'] > 0 ? true : false;
-  
-  // ****** Write output
-	while (wpp::foreach_post(array('cat' => $category), $more)) {
-	  $out .= '<li>
-	  <a href="' . get_permalink() . '">' . get_the_title() . '</a>
-	  <div class="">' . get_the_excerpt() . '</div>
-	  </li>';
-	}
-	if ($more) $out .= '<small class="wpwidget-more"><a href="' . '?cat=' . $category . '">' . __("Read more...") . '</a></small>';
-  
-  // \/ WIDGET CODE --------------------------------------------------\/
-	if (!empty($out)) {
-?>
-	<?php echo $before_widget; ?>
-		<?php echo $before_title . $title . $after_title; ?>
-		<ul>
-			<?php echo $out; ?>
-		</ul>
-	<?php echo $after_widget; ?>
-<?php
-	}
-	// /\ WIDGET CODE --------------------------------------------------/\
-}
-function wppwidget_control($args) {
-  /****************************************************************************************************
-   * Configure WPP foreach widget.
-   */
-  $class = 'wppwidget';
-  $key = ($args['number'] == -1) ? '%i%' : $args['number']; // -1 = no widget activated, %i% wildcard
-  $formclasskey = $class . '[' . $key . ']';
-	$options = $newoptions = get_option($class);
-	
-	// ****** Handle submit
-	if (isset($_POST[$class])) {
-	  foreach ($_POST[$class] as $key => $formoptions) {
-  		$newoptions[$key]['title'] = strip_tags(stripslashes($_POST[$class][$key]['title']));
-  		$newoptions[$key]['category'] = stripslashes($_POST[$class][$key]['category']);
-  		$newoptions[$key]['count'] = intval(stripslashes($_POST[$class][$key]['count']));
-  		$newoptions[$key]['more'] = isset($_POST[$class][$key]['more']);
-	  }
-	}
-	if ($options != $newoptions) {
-	  // TODO: MUST add cleanup code for removed widgets (hopefully in future added by WP team)
-		$options = $newoptions;
-		update_option($class, $options);
-	}
-	
-	// ****** Prepare current content for form output
-	$title = @attribute_escape($options[$key]['title']);
-	$category = @attribute_escape($options[$key]['category']);
-	$count = @intval(attribute_escape($options[$key]['count']));
-	$more = @(bool)intval($options[$key]['more']);
-?>
-		<p>
-		  <label for="<? echo $formclasskey; ?>[title]"><?php _e('Title:'); ?>
-		    <input class="widefat" id="<? echo $formclasskey; ?>[title]" name="<? echo $formclasskey; ?>[title]" type="text" value="<?php echo $title; ?>" />
-		  </label>
-		</p>
-		<p>
-			<label for="<? echo $formclasskey; ?>[category]"><?php _e( 'Category:' ); ?><br/>
-			  <?php
-			  wp_dropdown_categories(array(
-			    'name' => $formclasskey . '[category]',
-			    'hierarchical' => true,
-			    'hide_empty' => false,
-			    'selected' => $category,
-			    
-			    /*'show_option_all' => '', 'show_option_none' => '', 'orderby' => 'ID', 
-          'order' => 'ASC', 'show_last_update' => 0, 'show_count' => 0, 'hide_empty' => 1, 
-          'child_of' => 0, 'exclude' => '', 'echo' => 1, 'selected' => 0, 'hierarchical' => 0, 
-          'name' => 'cat', 'class' => 'postform', 'depth' => 0*/
-			  ));
-			  ?>
-			</label>
-		</p>
-		<p>
-			<label for="<? echo $formclasskey; ?>[count]">
-		    <input style="width: 25px; text-align: center;" id="<? echo $formclasskey; ?>[count]" name="<? echo $formclasskey; ?>[count]" type="text" value="<?php echo $count; ?>" />
-		    <?php _e('post(s) displayed'); ?>
-		  </label>
-		</p>
-		<p>
-		  <label for="<? echo $formclasskey; ?>[more]">
-				<input type="checkbox" class="checkbox" id="<? echo $formclasskey; ?>[more]" name="<? echo $formclasskey; ?>[more]"<?php checked($more, true); ?> />
-				<?php _e('Show "more" button'); ?>
-			</label>
-		</p>
-		<input type="hidden" id="<? echo $formclasskey; ?>[submit]" name="<? echo $formclasskey; ?>[submit]" value="1" />
-<?php
-}
-
-add_action('init', 'wordpressportal_multiregister');
-function wordpressportal_multiregister() {
-  /****************************************************************************************************
-   * Register multiple widgets.
-   *
-   * You only need to configure the few parameters below.
-   */
-  $name = 'WordPress Portal';
-  $description = 'Show any content from the specified category.';
-  $class = 'wppwidget'; // class id, widget fx and with "_control" appended as widget Admin fx.
-  
-  // ****** Init
-	$prefix = sanitize_title($name); // $id prefix
-	$widget_ops = array(
-	  'classname' => $class,
-	  'description' => __($description),
-	);
-	$control_ops = array(
-	  //'width' => 200,
-	  //'height' => 200,
-	  'id_base' => $prefix,
-	);
-	
-	// ****** Get Options
-	$options = get_option($class);
-	//if (isset($options[0])) unset($options[0]); // uh? why?
-	if (empty($options)) $options = array(array()); // Not initialized yet, create empty default.
-	
-	// ****** Initialize widgets
-	foreach($options as $key => $content) {
-		wp_register_sidebar_widget($prefix . '-' . $key, __($name), $class, $widget_ops, array('number' => $key));
-		wp_register_widget_control($prefix . '-' . $key, __($name), $class . '_control', $control_ops, array('number' => $key));
-	}
-}
 
 ?>
