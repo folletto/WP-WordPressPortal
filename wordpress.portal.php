@@ -61,6 +61,8 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
     static $loops = array();
     static $loops_backups = array();
     static $virtual_page = array();
+    static $local_url = null; // rewrites the current filesystem path to a web URL
+    static $purl = null; // contains the unmatched parts array() after wpp::add_virtual_page() match
     
     function foreach_anything($loopname, $filter = array(), $limit = -1) {
       /****************************************************************************************************
@@ -660,6 +662,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
         );
         
   			// ****** SmartAss Rewrite
+  			// NOTE: This function will trigger ONLY if it matches.
   			$url_wanted = rtrim(dirname($_SERVER['PHP_SELF']), "/") . "/" . $url;
   			$url_requested = substr(trim($_SERVER['REQUEST_URI']), 0, strlen($url_wanted));
   			if ($url_wanted == $url_requested) {
@@ -679,10 +682,25 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
   				');
   				add_filter('404_template', $fx);
           
-  				// ****** Service Operations
-  				wpp::$virtual_page[$url]['purl'] = explode("/", substr(trim($_SERVER['REQUEST_URI']), strlen($url_wanted) + 1));
+  				// Partial URL
+          // Contains the remainder of the URL, removing the real part and also the add_virtual_page part:
+          // it's just the unmatched string.
+          // i.e. "http://yoursite.example.org/virtual/path/purl/zone" with add_virtual_page("virtual/path", ...)
+          //      wpp::purl() => array('purl', 'zone');
+  				wpp::$purl = explode("/", substr(trim($_SERVER['REQUEST_URI']), strlen($url_wanted) + 1));
   			}
       }
+    }
+    function get_local_url() {
+      /****************************************************************************************************
+       * Get the URI path to the folder containing WPP.
+       * WPP filesystem location: "/users/–you/htdocs/wp-content/plugins/PluginName/lib/wordpress.portal.php"
+       * get_local_url() result: "http://yoursite.example.org/wp-content/plugins/PluginName/lib/"
+       * 
+       * @return  full URI folder string where WPP resides
+       */
+      if (wpp::$local_url == null) wpp::$local_url = get_bloginfo('url') . '/' . preg_replace('/.*(wp-content\/.*)/i', '\\1', dirname(__FILE__)) . '/';
+      return wpp::$local_url;
     }
   }
   
