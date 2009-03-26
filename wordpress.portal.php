@@ -10,11 +10,11 @@ Author URI: http://digitalhymn.com/
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Last revision: 2009 01 25
+ * Last revision: 2009 03 26
  *
  * by Davide 'Folletto' Casali <folletto AT gmail DOT com>
  * www.digitalhymn.com
- * Copyright (C) 2006/2009 - Creative Commons (CC) by-sa 2.5
+ * Copyright (C) 2006/2009 - GNU General Public License (GPL) 2.0
  * 
  * Based upon a library developed for key-one.it (Kallideas / Key-One)
  * Thanks to Roberto Ostinelli and Alessandro Morandi.
