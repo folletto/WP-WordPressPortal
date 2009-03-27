@@ -2,9 +2,9 @@
 /*
 Plugin Name: WordPress Portal
 Plugin URI: http://digitalhymn.com/argilla/wpp
-Description: This is a function library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
+Description: This is a widget and library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
-Version: 0.9.0
+Version: 0.9.1
 Author URI: http://digitalhymn.com/
  ******************************************************************************************
  * WordPress Portal
@@ -669,18 +669,22 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
   				// ****** Add Filter
   				$pages = "";
   				$fx = create_function('$handler', '
+  				  global $wp_query;
   				  $out = $handler;
   				  
         		foreach (array("' . join($handlers, '", "') . '") as $custom_template) {
         			if (file_exists($custom_template)) {
-        				$out = $custom_template;
+        				$out = $custom_template; // load our custom template
+        				$wp_query->is_404 = false; // not a 404 anymore
         				break;
         			}
         		}
-
+            
         		return $out;
   				');
-  				add_filter('404_template', $fx);
+  				remove_filter('template_redirect', 'redirect_canonical'); // we matched, avoid redirect! (risky?)
+  				add_filter('404_template', $fx, 11); // hack 404, priority def. 10, 11 to be the last executing
+  				
           
   				// Partial URL
           // Contains the remainder of the URL, removing the real part and also the add_virtual_page part:
