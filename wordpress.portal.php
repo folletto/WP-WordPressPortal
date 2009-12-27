@@ -4,16 +4,16 @@ Plugin Name: WordPress Portal
 Plugin URI: http://digitalhymn.com/argilla/wpp
 Description: This is a widget and library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
-Version: 0.9.1
-Author URI: http://digitalhymn.com/
+Version: 0.9.2
+Author URI: http://intenseminimalism.com/
  ******************************************************************************************
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Last revision: 2009 03 26
+ * Last revision: 2009 12 27
  *
  * by Davide 'Folletto' Casali <folletto AT gmail DOT com>
- * www.digitalhymn.com
+ * intenseminimalism.com
  * Copyright (C) 2006/2009 - GNU General Public License (GPL) 2.0
  * 
  * Based upon a library developed for key-one.it (Kallideas / Key-One)
@@ -54,7 +54,7 @@ Author URI: http://digitalhymn.com/
  */
 
 if (!isset($WPP_VERSION) && !class_exists("wpp")) {
-  $WPP_VERSION = 'WordPressPortal/0.9.0';
+  $WPP_VERSION = 'WordPressPortal/0.9.2';
   
   class wpp {
     
@@ -705,6 +705,28 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        */
       if (wpp::$local_url == null) wpp::$local_url = get_bloginfo('url') . '/' . preg_replace('/.*(wp-content\/.*)/i', '\\1', dirname(__FILE__)) . '/';
       return wpp::$local_url;
+    }
+    
+    function get_category_matching_partial($folder, $ext = "php", $parent = null) {
+      /****************************************************************************************************
+       * Check the folder passed as argument for files matching the category slug name and extension.
+       * Optionally you can restrict the search for the first level of children inside a specific parent,
+       * identified by its slug or numeric term_id.
+       * 
+       * @return  include-able path string
+       */
+      $out = "";
+      $categories = get_the_category();
+      if ($parent && !is_int($parent)) $parent = get_category_by_slug($parent)->term_id;
+      
+      foreach ($categories as $category) {
+        $out = get_template_directory() . "/" . trim($folder, '/') . "/" . $category->slug  . "." . $ext;
+        if (is_file($out)) break;
+        $out = null;
+      }
+      if (!$out) $out = get_template_directory() . "/" . trim($folder, '/') . "/default." . $ext;
+			
+			return $out;
     }
   }
   
