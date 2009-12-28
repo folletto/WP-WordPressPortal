@@ -39,6 +39,7 @@ Author URI: http://intenseminimalism.com/
  *  wpp::get_pages_root(): gets the root page of the current page subtree
  *  wpp::list_pages_of_section(): like wp_list_pages() but getting only the pages of the section
  *  wpp::add_virtual_page($url, $handlersarray): add a custom virtual page to be called when $url is called
+ *  wpp::get_category_matching_partial($folder): gets the path of a file matching the category slug from a folder
  * 
  * DETAILS:
  * The most interesting function is the wpp_foreach_post() that in fact creates a custom
@@ -64,7 +65,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
     static $local_url = null; // rewrites the current filesystem path to a web URL
     static $purl = null; // contains the unmatched parts array() after wpp::add_virtual_page() match
     
-    function foreach_anything($loopname, $filter = array(), $limit = -1) {
+    function foreach_anything($loopname, $filter = array(), $limit = null) {
       /****************************************************************************************************
        * Internal function.
        * Please use the specific functions: foreach_post, foreach_attachment.
@@ -88,7 +89,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
         wpp::$loops_backups[$loopname] = array('post' => $post, 'previousday' => $previousday);
         
         // *** Filter
-        if ($limit > 0) $filter['posts_per_page'] = $limit;
+        if ($limit != null) $filter['posts_per_page'] = intval($limit);
         
         // *** Make sure minimum defaults are used
         $defaults = array(
