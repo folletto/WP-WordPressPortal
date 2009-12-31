@@ -94,7 +94,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
         // *** Make sure minimum defaults are used
         $defaults = array(
           'post_type' => 'any', // any | attachment | post | page
-          'post_status' => 'published', // any | published | draft
+          'post_status' => 'publish', // any | published | draft
           'post_parent' => 0,
         );
         
