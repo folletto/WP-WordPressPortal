@@ -4,17 +4,17 @@ Plugin Name: WordPress Portal
 Plugin URI: http://digitalhymn.com/argilla/wpp
 Description: This is a widget and library to ease themes development. It could be included in the theme or added as plugin. You can add an updated plugin to fix existing themes.
 Author: Davide 'Folletto' Casali
-Version: 0.9.2
+Version: 10.1.10
 Author URI: http://intenseminimalism.com/
  ******************************************************************************************
  * WordPress Portal
  * WP Theming Functions Library
  * 
- * Last revision: 2009 12 27
+ * Last revision: 2010 01 10
  *
  * by Davide 'Folletto' Casali <folletto AT gmail DOT com>
  * intenseminimalism.com
- * Copyright (C) 2006/2009 - GNU General Public License (GPL) 2.0
+ * Copyright (C) 2006/2010 - GNU General Public License (GPL) 2.0
  * 
  * Based upon a library developed for key-one.it (Kallideas / Key-One)
  * Thanks to Roberto Ostinelli and Alessandro Morandi.
@@ -31,6 +31,7 @@ Author URI: http://intenseminimalism.com/
  *  wpp::uri_category($field, $default): gets the category of the loaded page
  *  wpp::in_category($nicename): [TheLoop] checks if the posts belongs to that category
  *  wpp::is_term_child_of($child, $parent): checks if the category is child of another (nicename)
+ *  wpp::related_posts(); gets the related posts using tag matching count (has format options)
  *  wpp::get_page_content($nicename, $on_empty): gets the specified page content
  *  wpp::get_zone(): gets an array containing ['type' => '...', 'id' => 'n', 'terms' => array(...)]
  *  wpp::is_admin($userid): check if the current logged user is an "administrator"
@@ -43,8 +44,8 @@ Author URI: http://intenseminimalism.com/
  * 
  * DETAILS:
  * The most interesting function is the wpp_foreach_post() that in fact creates a custom
- * "The Loop", using the syntax:
- *          while(wpp::foreach_post(array(...), 10)) { ... }
+ * "The Loop", (like WP_Query, but simpler) using the syntax:
+ *          while($post = wpp::foreach_post(array(...), 10)) { ... }
  * 
  * The function wpp::get_zone() retrieves the correct term from the page currently loaded.
  * For every loaded page it tries to match a tag (from the 'category' taxonomy).
@@ -55,15 +56,16 @@ Author URI: http://intenseminimalism.com/
  */
 
 if (!isset($WPP_VERSION) && !class_exists("wpp")) {
-  $WPP_VERSION = 'WordPressPortal/0.9.2';
+  $WPP_VERSION = 'WordPressPortal/10.1.10';
   
   class wpp {
     
+    static $id = "wordpressportal";
     static $loops = array();
     static $loops_backups = array();
     static $virtual_page = array();
     static $local_url = null; // rewrites the current filesystem path to a web URL
-    static $purl = null; // contains the unmatched parts array() after wpp::add_virtual_page() match
+    static $purl = null; // contains the unmatched parts array() after self::add_virtual_page() match
     
     function foreach_anything($loopname, $filter = array(), $limit = null) {
       /****************************************************************************************************
@@ -71,7 +73,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        * Please use the specific functions: foreach_post, foreach_attachment.
        * Creates a custom The Loop to access anything: posts, pages, revisions, attachments.
        * Syntax:
-       *   while(wpp::foreach_anything('posts', array(...), 10) { ... }
+       *   while(self::foreach_anything('posts', array(...), 10) { ... }
        * 
        * @param     loop name
        * @param      query parameteres array
@@ -84,9 +86,9 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
       
       $out = false;
       
-      if (wpp::is_foreach_init_season($loopname)) {
+      if (self::is_foreach_init_season($loopname)) {
         // *** Backup
-        wpp::$loops_backups[$loopname] = array('post' => $post, 'previousday' => $previousday);
+        self::$loops_backups[$loopname] = array('post' => $post, 'previousday' => $previousday);
         
         // *** Filter
         if ($limit != null) $filter['posts_per_page'] = intval($limit);
@@ -100,23 +102,23 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
         
         // *** Query
         $args = wp_parse_args($filter, $defaults);
-        wpp::$loops[$loopname] = new WP_Query($args);
+        self::$loops[$loopname] = new WP_Query($args);
       }
       
       // ****** Elaborate the custom The WPP Loop
-      if (wpp::$loops[$loopname]->have_posts()) {
+      if (self::$loops[$loopname]->have_posts()) {
         // *** Next
-        wpp::$loops[$loopname]->the_post();
+        self::$loops[$loopname]->the_post();
         $out = $post;
       } else {
         // *** Reset
-        unset(wpp::$loops[$loopname]); // kill custom loop
+        unset(self::$loops[$loopname]); // kill custom loop
         $out = $post = null;
     
         // *** Restore backup
-        $post = wpp::$loops_backups[$loopname]['post'];
+        $post = self::$loops_backups[$loopname]['post'];
         setup_postdata($post); // WP hook
-        $previousday = wpp::$loops_backups[$loopname]['previousday'];
+        $previousday = self::$loops_backups[$loopname]['previousday'];
       }
 
       return $out;
@@ -129,21 +131,21 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        * @param     internal loop name
        * @return    boolean
        */
-      return (!isset(wpp::$loops[$loopname]) || wpp::$loops[$loopname] === null);
+      return (!isset(self::$loops[$loopname]) || self::$loops[$loopname] === null);
     }
     
     function foreach_post($filter = array(), $limit = null) {
       /****************************************************************************************************
        * Creates a custom The Loop (i.e. like: while (have_posts()) : the_post(); [...] endwhile;).
        * Syntax:
-       *   while(wpp::foreach_post(array(...), 10)) { ... }
+       *   while(self::foreach_post(array(...), 10)) { ... }
        * 
        * @param     query parameteres array
        * @param      limit number of items
        * @return    item or false
        */
       $loopname = 'posts';
-      if (wpp::is_foreach_init_season($loopname)) {
+      if (self::is_foreach_init_season($loopname)) {
         if (!is_array($filter)) $filter = array();
         
         if (isset($filter['category'])) {
@@ -160,7 +162,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
         }
       }
       
-      return wpp::foreach_anything($loopname, $filter, $limit);
+      return self::foreach_anything($loopname, $filter, $limit);
     }
     function get_posts($filter, $limit = null) {
       /****************************************************************************************************
@@ -172,7 +174,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        */
       $posts = array();
 
-      while ($post = wpp::foreach_post($filter, $limit)) {
+      while ($post = self::foreach_post($filter, $limit)) {
         $posts[] = $post;
       }
 
@@ -183,7 +185,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
       /****************************************************************************************************
        * Creates a custom The Loop to list attachments of the current post (or the passed one)
        * Syntax:
-       *   while(wpp::foreach_attachment(array(...), 10)) { ... }
+       *   while(self::foreach_attachment(array(...), 10)) { ... }
        * 
        * @param     query parameteres array
        * @param      limit number of items
@@ -192,7 +194,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
       global $post;
       
       $loopname = 'attachments';
-      if (wpp::is_foreach_init_season($loopname)) {
+      if (self::is_foreach_init_season($loopname)) {
         if (!is_array($filter)) $filter = array();
         
         if (!isset($filter['post_parent'])) $filter['post_parent'] = $post->ID;
@@ -208,7 +210,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
         $filter['orderby'] = "menu_order ASC, title DESC";
       }
       
-      return wpp::foreach_anything($loopname, $filter, $limit);
+      return self::foreach_anything($loopname, $filter, $limit);
     }
     function get_attachments($filter = array(), $limit = -1) {
       /****************************************************************************************************
@@ -220,7 +222,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        */
       $posts = array();
 
-      while ($post = wpp::foreach_attachment($filter, $limit)) {
+      while ($post = self::foreach_attachment($filter, $limit)) {
         $posts[] = $post;
       }
 
@@ -290,7 +292,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
           
             if ($levels != 0) {
               $levels--;
-              $out = array_merge($out, wpp::get_terms_recursive($term->term_id, $levels, $taxonomy));
+              $out = array_merge($out, self::get_terms_recursive($term->term_id, $levels, $taxonomy));
             }
           }
         }
@@ -307,7 +309,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        * @param    (optional) optional parent nicename
        * @return  boolean
        */
-      return wpp::is_term_child_of($nicename, get_the_category());
+      return self::is_term_child_of($nicename, get_the_category());
     }
     function is_term_child_of($child_term, $parent_term) {
       /****************************************************************************************************
@@ -320,7 +322,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
       if (is_array($parent_term)) {
         $terms = $parent_term;
       } else {
-        $terms = wpp::get_terms_recursive(strval($parent_term));
+        $terms = self::get_terms_recursive(strval($parent_term));
       }
 
       foreach ($terms as $term) {
@@ -330,6 +332,93 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
       }
   
       return false;
+    }
+    function related_posts($number = null, $category = null, $format = null, $dateformat = null, $post_id = 0, $noposts = null) {
+      /****************************************************************************************************
+       * Get the post related to the current-looping post's matching tags.
+       * Simplified from Simple Tags plugin. A very good one.
+       * 
+       * @param     numer of related posts to extract (max)
+       * @param     output format (has a default)
+       * @param     date format (defaults to WP default)
+       * @param     post_id (optional post id, by default it uses the current The Loop post)
+       * @param     string displayed when no posts are retrieved
+       * @return    html string
+       */
+      global $wpdb;
+      if (!$number) $number = 3;
+      if (!$format) $format = '<a href="%post_permalink%" title="%post_title%">%post_title%</a> <span class="date">%post_date%</span> <span class="comments">%post_comment% comments</span>';
+      if (!$dateformat) $dateformat = get_option('date_format');
+      if (!$noposts) $noposts = '<div class="related-posts">No related posts.</div>';
+
+  		// ****** Get current post data
+  		$post_id = intval($post_id);
+  		if ($post_id == 0) {
+  			global $post;
+  			$post_id = (int)$post->ID;
+  		}
+
+  		// ****** Cache
+  		$cachekey = 'relatedposts-' . $post_id . '-' . md5($number . $format . $dateformat . $noposts);
+  		$results = wp_cache_get($cachekey, self::$id . "-relatedposts");
+
+  		// ****** No cache, query
+  		if ($results === false) {
+  			// ****** Set variables
+  			$tags = get_the_tags($post_id);
+  			if ($tags == false || $post_id == 0) return $noposts; // --> EXIT
+
+  			if ($category) $category = "AND tm.name = '{$category}'";
+
+  			// Limit days - 86400 seconds = 1 day
+  			//$limitdays_sql = 'AND posts.post_date > "' . date('Y-m-d H:i:s', time() - $limit_days * 86400). '"';
+
+  			// ****** SQL Tags list
+  			$taglist = array();
+  			foreach ($tags as $tag) { $taglist[] = '"' . $tag->term_id . '"'; };
+  			$taglist = join($taglist, ", ");
+
+  			$results = $wpdb->get_results(
+  			  "SELECT DISTINCT p.ID, p.post_title, p.post_excerpt, p.comment_count, p.post_date, COUNT(tr.object_id) AS rank
+  				FROM {$wpdb->posts} AS p
+  				INNER JOIN {$wpdb->term_relationships} AS tr ON p.ID = tr.object_id
+  				INNER JOIN {$wpdb->term_taxonomy} AS tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+  				INNER JOIN {$wpdb->terms} AS tm ON tm.term_id = tt.term_id
+  				WHERE
+  				  tt.taxonomy = 'post_tag'
+  				  AND (tt.term_id IN ({$taglist}))
+  				  AND p.post_status = 'publish'
+  				  AND p.post_type = 'post'
+  				  AND p.ID != {$post_id}
+  				  AND p.post_date < '" . current_time('mysql') . "'
+  				GROUP BY tr.object_id
+  				ORDER BY rank DESC
+  				LIMIT 0, {$number}
+  			");
+
+  			// ****** Cache
+  			wp_cache_set($cachekey, $results, self::$id . "-relatedposts");
+  		}
+  		if (!$results) return $noposts; // --> EXIT
+
+  		// ****** Format items
+  		foreach ($results as $result) {
+  		  $output[] = strtr($format, array(
+          '%post_id%' => $result->ID,
+          '%post_title%' => $result->post_title,
+          '%post_date%' => mysql2date($dateformat, $result->post_date),
+          '%post_permalink%' => get_permalink($result->ID),
+          '%post_excerpt%' => $result->post_excerpt,
+          '%post_comment%' => $result->comment_count
+        ));
+      }
+
+      // ****** Output
+      $out = '<ul class="related-posts">' . "\r\n";
+      $out .= '<li>' . join("</li>\r\n\t\t<li>", $output) . '</li>' . "\r\n";
+      $out .= '</ul>' . "\r\n";
+
+      return $out;
     }
     
     function get_page_content($nicename, $on_empty = "The page '%s' is empty.") {
@@ -342,7 +431,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        */
       $out = '';
     
-      $posts = wpp::get_posts(array('page' => $nicename));
+      $posts = self::get_posts(array('page' => $nicename));
       if ($posts[0]->post_content)
         $out = $posts[0]->post_content;
       else
@@ -644,7 +733,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        * @param    (optional) formatting arguments for wp_list_pages()
        * @param    (optional) boolean false to disable echo and trigger return data behaviour
        */
-      $root = wpp::get_pages_root();
+      $root = self::get_pages_root();
       return wp_list_pages($arguments . "&child_of=" . $root['page']->ID);
     }
     
@@ -658,7 +747,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
       if (is_array($handlers) && sizeof($handlers)) {
         // ****** Prepare data
         $url = rtrim($url, "/");
-        wpp::$virtual_page[$url] = array(
+        self::$virtual_page[$url] = array(
           'handlers' => $handlers,
         );
         
@@ -691,8 +780,8 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
           // Contains the remainder of the URL, removing the real part and also the add_virtual_page part:
           // it's just the unmatched string.
           // i.e. "http://yoursite.example.org/virtual/path/purl/zone" with add_virtual_page("virtual/path", ...)
-          //      wpp::purl() => array('purl', 'zone');
-  				wpp::$purl = explode("/", substr(trim($_SERVER['REQUEST_URI']), strlen($url_wanted) + 1));
+          //      self::purl() => array('purl', 'zone');
+  				self::$purl = explode("/", substr(trim($_SERVER['REQUEST_URI']), strlen($url_wanted) + 1));
   			}
       }
     }
@@ -704,8 +793,8 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
        * 
        * @return  full URI folder string where WPP resides
        */
-      if (wpp::$local_url == null) wpp::$local_url = get_bloginfo('url') . '/' . preg_replace('/.*(wp-content\/.*)/i', '\\1', dirname(__FILE__)) . '/';
-      return wpp::$local_url;
+      if (self::$local_url == null) self::$local_url = get_bloginfo('url') . '/' . preg_replace('/.*(wp-content\/.*)/i', '\\1', dirname(__FILE__)) . '/';
+      return self::$local_url;
     }
     
     function get_category_matching_partial($folder, $ext = "php", $parent = null) {
@@ -751,7 +840,7 @@ if (!isset($WPP_VERSION) && !class_exists("wpp")) {
   	$more = $options['more'] > 0 ? true : false;
 
     // ****** Write output
-  	while (wpp::foreach_post(array('cat' => $category), $more)) {
+  	while (self::foreach_post(array('cat' => $category), $more)) {
   	  $out .= '<li>
   	  <a href="' . get_permalink() . '">' . get_the_title() . '</a>
   	  <div class="">' . get_the_excerpt() . '</div>
